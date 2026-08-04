@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { analyzeAndApplyMemoryDraft } from "@/features/diary-generation/analyze-memory";
+import { GenerationModeSchema } from "@/lib/ai/types";
 import { requireSiteSession } from "@/lib/security/require-site-session";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 
@@ -9,6 +10,9 @@ const BodySchema = z.object({
   tone: z.string().max(40).optional(),
   excludedDetails: z.string().max(1000).optional(),
   language: z.string().max(20).optional(),
+  mode: GenerationModeSchema.optional(),
+  preserveTitle: z.boolean().optional(),
+  preserveOneLine: z.boolean().optional(),
 });
 
 export const runtime = "nodejs";
@@ -37,12 +41,16 @@ export async function POST(request: Request) {
       tone: parsed.data.tone,
       excludedDetails: parsed.data.excludedDetails,
       language: parsed.data.language,
+      mode: parsed.data.mode,
+      preserveTitle: parsed.data.preserveTitle,
+      preserveOneLine: parsed.data.preserveOneLine,
     });
 
     return NextResponse.json({
       ok: true,
       provider: result.provider,
       analysis: result.analysis,
+      applied: result.applied,
     });
   } catch (error) {
     return NextResponse.json(

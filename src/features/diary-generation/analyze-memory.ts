@@ -1,6 +1,9 @@
 import sharp from "sharp";
 import { createAIProvider, getActiveAIProviderName } from "@/lib/ai";
-import type { MemoryAnalysisResult } from "@/lib/ai/types";
+import type {
+  GenerationMode,
+  MemoryAnalysisResult,
+} from "@/lib/ai/types";
 import { appConfig } from "@/config/app";
 import { createServiceClient } from "@/lib/supabase/admin";
 
@@ -10,15 +13,21 @@ export type AnalyzeMemoryOptions = {
   tone?: string;
   excludedDetails?: string;
   language?: string;
+  mode?: GenerationMode;
+  preserveTitle?: boolean;
+  preserveOneLine?: boolean;
 };
 
 export async function analyzeAndApplyMemoryDraft(options: AnalyzeMemoryOptions) {
   const supabase = createServiceClient();
+  const mode: GenerationMode = options.mode ?? "title_and_diary";
+  const preserveTitle = options.preserveTitle ?? false;
+  const preserveOneLine = options.preserveOneLine ?? false;
 
   const { data: event, error } = await supabase
     .from("memory_events")
     .select(
-      "id, title, one_line, diary_body, event_date, place_name, user_note, template_id",
+      "id, title, one_line, diary_body, event_date, place_name, user_note, chapter, template_id",
     )
     .eq("id", options.memoryId)
     .eq("owner_id", options.ownerId)
@@ -88,6 +97,9 @@ export async function analyzeAndApplyMemoryDraft(options: AnalyzeMemoryOptions) 
   const provider = createAIProvider();
   const providerName = getActiveAIProviderName();
 
+  // Title is only fed to the model when preserveTitle is on (or diary_only needs alignment).
+  const includeTitleAsInput = preserveTitle || mode === "diary_only";
+
   const analysis = await provider.analyzeMemory({
     language: options.language ?? settings?.default_language ?? "zh-CN",
     tone: options.tone ?? settings?.default_diary_tone ?? "温柔日记",
@@ -96,24 +108,40 @@ export async function analyzeAndApplyMemoryDraft(options: AnalyzeMemoryOptions) 
     relationshipContext: settings
       ? `${settings.relationship_title} · ${settings.owner_name} / ${settings.partner_name}`
       : "私人情侣时光档案",
+    mode,
+    preserveTitle,
+    preserveOneLine,
+    currentTitle: includeTitleAsInput ? event.title : null,
+    currentOneLine: event.one_line,
+    currentDiaryBody: event.diary_body,
     eventMetadata: {
       eventDate: event.event_date,
       placeName: event.place_name,
+      chapter: event.chapter,
       photoCount: photoObservations.length,
     },
     photoObservations,
     analysisImageDataUrls,
   });
 
-  await applyAnalysisToMemory({
+  const applied = await applyAnalysisToMemory({
     ownerId: options.ownerId,
     memoryId: options.memoryId,
     analysis,
     tone: options.tone ?? settings?.default_diary_tone ?? "温柔日记",
+    mode,
+    preserveTitle,
+    preserveOneLine,
+    previous: {
+      title: event.title,
+      oneLine: event.one_line,
+      diaryBody: event.diary_body,
+    },
   });
 
   return {
     analysis,
+    applied,
     provider: providerName,
   };
 }
@@ -123,32 +151,61 @@ async function applyAnalysisToMemory(input: {
   memoryId: string;
   analysis: MemoryAnalysisResult;
   tone: string;
+  mode: GenerationMode;
+  preserveTitle: boolean;
+  preserveOneLine: boolean;
+  previous: {
+    title: string;
+    oneLine: string | null;
+    diaryBody: string | null;
+  };
 }) {
   const supabase = createServiceClient();
 
-  const { error: versionError } = await supabase.from("diary_versions").insert({
+  const nextTitle =
+    input.preserveTitle || input.mode === "diary_only"
+      ? input.previous.title
+      : input.analysis.recommendedTitle;
+
+  const nextOneLine =
+    input.preserveOneLine || input.mode === "title_only"
+      ? input.previous.oneLine
+      : input.analysis.oneLine;
+
+  const nextDiaryBody =
+    input.mode === "title_only"
+      ? (input.previous.diaryBody ?? input.analysis.diaryBody)
+      : input.analysis.diaryBody;
+
+  // Save previous version before replacing any content.
+  if (input.previous.diaryBody || input.previous.title) {
+    const { error: previousVersionError } = await supabase.from("diary_versions").insert({
+      event_id: input.memoryId,
+      title: input.previous.title,
+      one_line: input.previous.oneLine,
+      diary_body: input.previous.diaryBody ?? "",
+      tone: "pre_ai",
+      source: "user",
+    });
+    if (previousVersionError) throw new Error(previousVersionError.message);
+  }
+
+  const { error: aiVersionError } = await supabase.from("diary_versions").insert({
     event_id: input.memoryId,
-    title: input.analysis.title,
-    one_line: input.analysis.oneLine,
-    diary_body: input.analysis.diaryBody,
+    title: nextTitle,
+    one_line: nextOneLine,
+    diary_body: nextDiaryBody ?? input.analysis.diaryBody,
     tone: input.tone,
     source: "ai",
   });
-  if (versionError) throw new Error(versionError.message);
+  if (aiVersionError) throw new Error(aiVersionError.message);
 
   const { error: updateError } = await supabase
     .from("memory_events")
     .update({
-      title: input.analysis.title,
-      subtitle: input.analysis.subtitle,
-      one_line: input.analysis.oneLine,
-      diary_body: input.analysis.diaryBody,
-      mood: input.analysis.mood,
-      chapter: input.analysis.chapterSuggestion,
-      template_id: input.analysis.templateSuggestion,
-      ...(input.analysis.placeSuggestion
-        ? { place_name: input.analysis.placeSuggestion }
-        : {}),
+      title: nextTitle,
+      one_line: nextOneLine,
+      diary_body: nextDiaryBody,
       ai_generated: true,
       ai_confidence: input.analysis.confidence,
       updated_at: new Date().toISOString(),
@@ -158,23 +215,11 @@ async function applyAnalysisToMemory(input: {
 
   if (updateError) throw new Error(updateError.message);
 
-  // Apply suggested photo roles when photoIds match.
-  for (const role of input.analysis.photoRoles) {
-    await supabase
-      .from("event_photos")
-      .update({ role: role.role })
-      .eq("event_id", input.memoryId)
-      .eq("photo_id", role.photoId);
-  }
-
-  const cover = input.analysis.photoRoles.find((item) => item.role === "cover");
-  if (cover) {
-    await supabase
-      .from("memory_events")
-      .update({ cover_photo_id: cover.photoId })
-      .eq("id", input.memoryId)
-      .eq("owner_id", input.ownerId);
-  }
+  return {
+    title: nextTitle,
+    oneLine: nextOneLine,
+    diaryBody: nextDiaryBody,
+  };
 }
 
 export async function listDiaryVersions(ownerId: string, memoryId: string) {

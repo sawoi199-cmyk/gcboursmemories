@@ -28,6 +28,7 @@ Phase 8 — 测试与部署（已落地骨架；生产部署需你在 Vercel/Sup
 
 ## Notes
 
+- UX：AI 面板只改标题/一句话/正文；支持「生成标题与日记 / 只重写标题 / 只重写日记」与保留选项；失败保留表单（Decision 007 修订）
 - 功能：删除草稿/已发布回忆 + 编辑器移除照片 + 上传清除失败项（Decision 015）；**需重新部署 GAS Web App（含 `deleteFile`）**
 - Bugfix：后台「回忆」列表未随发布/上传失效，前台 3 条后台只显示 2 条；已对 Studio 列表 `force-dynamic` + `revalidatePath`
 - 仓库：https://github.com/asushi199/gcbours

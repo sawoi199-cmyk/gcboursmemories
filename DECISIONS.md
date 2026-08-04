@@ -78,12 +78,12 @@ Consequences:
 Date: 2026-08-04
 Status: Accepted
 Context: Phase 5 需要可切换的日记生成能力，且无 API Key 时系统仍可用。
-Decision: 统一 `AIProvider.analyzeMemory`；默认 Mock；有 Key 时用 OpenAI-compatible Chat Completions（JSON + 一次 schema 修复）。生成结果写入 `diary_versions`（source=ai）并更新 draft 字段，不自动发布。分析图仅用缩略图再压缩，不送原图。对 Groq 关闭 `response_format` JSON 模式；reasoning 按模型族区分：Qwen/Compound 用 `none`+`reasoning_format=hidden`；GPT-OSS 用 `low`（不支持 none / reasoning_format）；Llama 不发送。
-Reason: 符合 SPEC 的事实约束与可替换 Provider；保护隐私与稳定性。
+Decision: 统一 `AIProvider.analyzeMemory`；默认 Mock；有 Key 时用 OpenAI-compatible Chat Completions（JSON + 一次 schema 修复）。生成结果写入 `diary_versions`（先存上一版 source=user，再存 AI 版）并**仅**更新 `title` / `one_line` / `diary_body`（及 ai 元数据），不改章节、地点、模板、照片角色，不自动发布。Schema 含三类标题候选 + recommendedTitle + factsUsed；支持 mode=`title_and_diary|title_only|diary_only` 与 preserveTitle / preserveOneLine。现有标题默认不喂给模型，除非 preserveTitle 或 diary_only。分析图仅用缩略图再压缩。对 Groq 关闭 JSON 模式；reasoning 按模型族区分（Qwen `none`，GPT-OSS `low`，Llama 不发）。
+Reason: 符合 SPEC 的事实约束与可替换 Provider；保护隐私与稳定性；避免每次生成冲掉用户已调好的排版字段。
 Consequences:
-- 编辑器可展示 `questionsToConfirm` / `inferredFacts` / 版本恢复。
+- 编辑器展示备选标题 chips、`questionsToConfirm` / `factsUsed` / `inferredFacts` / 版本恢复；推断与问题不写入公开日记。
 - 真实多模态依赖模型是否支持 image_url；默认 `AI_VISION=false`。
-- Groq 日记可试：`openai/gpt-oss-120b`（`reasoning_effort=low`）；Qwen 用 `none`；Llama 不带 reasoning 参数。
+- Groq 日记常用：`qwen/qwen3.6-27b`（`reasoning_effort=none`）。
 
 ## Decision 008
 

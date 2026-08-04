@@ -63,6 +63,12 @@ export class OpenAICompatibleProvider implements AIProvider {
       userNote: input.userNote,
       excludedDetails: input.excludedDetails,
       relationshipContext: input.relationshipContext,
+      mode: input.mode,
+      preserveTitle: input.preserveTitle,
+      preserveOneLine: input.preserveOneLine,
+      currentTitle: input.currentTitle,
+      currentOneLine: input.currentOneLine,
+      currentDiaryBody: input.currentDiaryBody,
       eventMetadata: JSON.stringify(input.eventMetadata, null, 2),
       photoObservations: JSON.stringify(input.photoObservations, null, 2),
     });

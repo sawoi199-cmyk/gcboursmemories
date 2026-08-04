@@ -41,9 +41,16 @@ export function MemoryEditor({ initial }: MemoryEditorProps) {
   const skipFirstAutosave = useRef(true);
   const [tone, setTone] = useState("温柔日记");
   const [excludedDetails, setExcludedDetails] = useState("");
+  const [preserveTitle, setPreserveTitle] = useState(false);
+  const [preserveOneLine, setPreserveOneLine] = useState(false);
   const [aiBusy, setAiBusy] = useState(false);
+  const [titleCandidates, setTitleCandidates] = useState<
+    Array<{ kind: "event" | "emotion" | "detail"; text: string }>
+  >([]);
   const [questions, setQuestions] = useState<string[]>([]);
   const [inferredFacts, setInferredFacts] = useState<string[]>([]);
+  const [factsUsed, setFactsUsed] = useState<string[]>([]);
+  const [aiConfidence, setAiConfidence] = useState<number | null>(null);
   const [aiProvider, setAiProvider] = useState<string | null>(null);
   const [versions, setVersions] = useState(initial.diaryVersions);
   const [status, setStatus] = useState(initial.memory.status);
@@ -192,7 +199,17 @@ export function MemoryEditor({ initial }: MemoryEditorProps) {
     }
   }
 
-  async function runAI() {
+  async function runAI(mode: "title_and_diary" | "title_only" | "diary_only") {
+    const titleBefore = title;
+    const oneLineBefore = oneLine;
+    const diaryBefore = diaryBody;
+    const questionsBefore = questions;
+    const inferredBefore = inferredFacts;
+    const factsBefore = factsUsed;
+    const candidatesBefore = titleCandidates;
+    const confidenceBefore = aiConfidence;
+    const providerBefore = aiProvider;
+
     setAiBusy(true);
     setError(null);
     try {
@@ -205,46 +222,59 @@ export function MemoryEditor({ initial }: MemoryEditorProps) {
           tone,
           excludedDetails,
           language: "zh-CN",
+          mode,
+          preserveTitle,
+          preserveOneLine,
         }),
       });
       const json = (await response.json()) as {
         ok?: boolean;
         message?: string;
         provider?: string;
-        analysis?: {
+        applied?: {
           title: string;
+          oneLine: string | null;
+          diaryBody: string | null;
+        };
+        analysis?: {
+          recommendedTitle: string;
           oneLine: string;
           diaryBody: string;
-          templateSuggestion: string;
-          chapterSuggestion?: string;
-          placeSuggestion: string | null;
+          titleCandidates: Array<{ kind: "event" | "emotion" | "detail"; text: string }>;
+          factsUsed: string[];
           questionsToConfirm: string[];
           inferredFacts: string[];
+          confidence: number;
         };
       };
-      if (!response.ok || !json.ok || !json.analysis) {
+      if (!response.ok || !json.ok || !json.analysis || !json.applied) {
         throw new Error(json.message ?? "AI generation failed");
       }
 
-      setTitle(json.analysis.title);
-      setOneLine(json.analysis.oneLine);
-      setDiaryBody(json.analysis.diaryBody);
-      setTemplateId(json.analysis.templateSuggestion);
-      if (
-        json.analysis.chapterSuggestion &&
-        (CHAPTER_IDS as readonly string[]).includes(json.analysis.chapterSuggestion)
-      ) {
-        setChapter(json.analysis.chapterSuggestion as ChapterId);
-      }
-      if (json.analysis.placeSuggestion) {
-        setPlaceName(json.analysis.placeSuggestion);
-      }
+      // Only title / one-line / diary — never chapter, place, template, photos.
+      setTitle(json.applied.title);
+      setOneLine(json.applied.oneLine ?? "");
+      setDiaryBody(json.applied.diaryBody ?? "");
+      setSavedTitle(json.applied.title);
+      setTitleCandidates(json.analysis.titleCandidates ?? []);
       setQuestions(json.analysis.questionsToConfirm ?? []);
       setInferredFacts(json.analysis.inferredFacts ?? []);
+      setFactsUsed(json.analysis.factsUsed ?? []);
+      setAiConfidence(json.analysis.confidence ?? null);
       setAiProvider(json.provider ?? null);
       setSavedAt(`AI 草稿已写入 · ${new Date().toLocaleTimeString("zh-CN")}`);
       await loadVersions();
     } catch (err) {
+      // Preserve all existing form data on failure.
+      setTitle(titleBefore);
+      setOneLine(oneLineBefore);
+      setDiaryBody(diaryBefore);
+      setQuestions(questionsBefore);
+      setInferredFacts(inferredBefore);
+      setFactsUsed(factsBefore);
+      setTitleCandidates(candidatesBefore);
+      setAiConfidence(confidenceBefore);
+      setAiProvider(providerBefore);
       setError(err instanceof Error ? err.message : "AI generation failed");
     } finally {
       setAiBusy(false);
@@ -692,7 +722,7 @@ export function MemoryEditor({ initial }: MemoryEditorProps) {
             <div className="mt-5 rounded-xl border border-line bg-background p-3">
               <p className="text-xs font-medium text-ink">AI 日记草稿</p>
               <p className="mt-1 text-[11px] text-muted-ours">
-                基于备注、时间地点与照片元数据生成草稿；失败不会删照片。
+                只改标题、一句话与正文；地点、章节、模板与照片布局保持不动。失败不会清空你已填的内容。
               </p>
               <label className="mt-3 block text-xs text-muted-ours" htmlFor="tone">
                 语气
@@ -721,14 +751,53 @@ export function MemoryEditor({ initial }: MemoryEditorProps) {
                 className="mt-1 w-full rounded-lg border border-line bg-paper px-2 py-1.5 text-xs"
                 placeholder="可选"
               />
-              <button
-                type="button"
-                disabled={aiBusy}
-                onClick={() => void runAI()}
-                className={cn(buttonVariants({ size: "sm" }), "mt-3 w-full")}
-              >
-                {aiBusy ? "生成中…" : "生成 / 重新生成日记"}
-              </button>
+              <div className="mt-3 space-y-2">
+                <label className="flex items-center gap-2 text-[11px] text-muted-ours">
+                  <input
+                    type="checkbox"
+                    checked={preserveTitle}
+                    onChange={(event) => setPreserveTitle(event.target.checked)}
+                  />
+                  保留当前标题
+                </label>
+                <label className="flex items-center gap-2 text-[11px] text-muted-ours">
+                  <input
+                    type="checkbox"
+                    checked={preserveOneLine}
+                    onChange={(event) => setPreserveOneLine(event.target.checked)}
+                  />
+                  保留当前一句话
+                </label>
+              </div>
+              <div className="mt-3 flex flex-col gap-2">
+                <button
+                  type="button"
+                  disabled={aiBusy}
+                  onClick={() => void runAI("title_and_diary")}
+                  className={cn(buttonVariants({ size: "sm" }), "w-full")}
+                >
+                  {aiBusy ? "生成中…" : "生成标题与日记"}
+                </button>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    disabled={aiBusy || preserveTitle}
+                    title={preserveTitle ? "已勾选保留标题" : undefined}
+                    onClick={() => void runAI("title_only")}
+                    className={cn(buttonVariants({ size: "sm", variant: "outline" }), "w-full")}
+                  >
+                    只重写标题
+                  </button>
+                  <button
+                    type="button"
+                    disabled={aiBusy}
+                    onClick={() => void runAI("diary_only")}
+                    className={cn(buttonVariants({ size: "sm", variant: "outline" }), "w-full")}
+                  >
+                    只重写日记
+                  </button>
+                </div>
+              </div>
               {error ? (
                 <p className="mt-2 text-[11px] leading-relaxed text-accent-ours" role="alert">
                   {error}
@@ -738,11 +807,46 @@ export function MemoryEditor({ initial }: MemoryEditorProps) {
                 <p className="mt-2 text-[11px] text-muted-ours">正在调用模型，通常需要几秒…</p>
               ) : null}
               {aiProvider ? (
-                <p className="mt-2 text-[11px] text-muted-ours">Provider: {aiProvider}</p>
+                <p className="mt-2 text-[11px] text-muted-ours">
+                  Provider: {aiProvider}
+                  {aiConfidence != null ? ` · 置信度 ${(aiConfidence * 100).toFixed(0)}%` : ""}
+                </p>
+              ) : null}
+              {titleCandidates.length > 0 ? (
+                <div className="mt-3">
+                  <p className="text-[11px] font-medium text-ink">备选标题</p>
+                  <div className="mt-1.5 flex flex-wrap gap-1.5">
+                    {titleCandidates.map((candidate) => (
+                      <button
+                        key={`${candidate.kind}-${candidate.text}`}
+                        type="button"
+                        disabled={aiBusy}
+                        onClick={() => setTitle(candidate.text)}
+                        className="rounded-full border border-line bg-paper px-2.5 py-1 text-left text-[11px] text-ink transition hover:border-ink"
+                        title={
+                          candidate.kind === "event"
+                            ? "事件向"
+                            : candidate.kind === "emotion"
+                              ? "情绪向"
+                              : "细节向"
+                        }
+                      >
+                        <span className="mr-1 text-muted-ours">
+                          {candidate.kind === "event"
+                            ? "事"
+                            : candidate.kind === "emotion"
+                              ? "情"
+                              : "细"}
+                        </span>
+                        {candidate.text}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               ) : null}
               {questions.length > 0 ? (
                 <div className="mt-3">
-                  <p className="text-[11px] font-medium text-ink">待确认</p>
+                  <p className="text-[11px] font-medium text-ink">待确认（不会写入公开日记）</p>
                   <ul className="mt-1 list-disc space-y-1 pl-4 text-[11px] text-muted-ours">
                     {questions.map((item) => (
                       <li key={item}>{item}</li>
@@ -750,9 +854,19 @@ export function MemoryEditor({ initial }: MemoryEditorProps) {
                   </ul>
                 </div>
               ) : null}
+              {factsUsed.length > 0 ? (
+                <div className="mt-3">
+                  <p className="text-[11px] font-medium text-ink">用到的事实</p>
+                  <ul className="mt-1 list-disc space-y-1 pl-4 text-[11px] text-muted-ours">
+                    {factsUsed.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
               {inferredFacts.length > 0 ? (
                 <div className="mt-3">
-                  <p className="text-[11px] font-medium text-ink">推断（需复核）</p>
+                  <p className="text-[11px] font-medium text-ink">推断（需复核，未写入日记）</p>
                   <ul className="mt-1 list-disc space-y-1 pl-4 text-[11px] text-muted-ours">
                     {inferredFacts.map((item) => (
                       <li key={item}>{item}</li>
