@@ -31,9 +31,14 @@ function isGroqBaseUrl(baseUrl: string) {
   return /groq\.com/i.test(baseUrl);
 }
 
-/** Qwen / GPT-OSS on Groq accept reasoning_* params; Llama rejects them with 400. */
-function supportsGroqReasoningControls(model: string) {
-  return /qwen|gpt-oss|compound/i.test(model);
+/** Groq GPT-OSS: reasoning_effort is low|medium|high; reasoning_format unsupported. */
+function isGroqGptOss(model: string) {
+  return /gpt-oss/i.test(model);
+}
+
+/** Groq Qwen/Compound: reasoning_effort is none|default; may accept reasoning_format. */
+function isGroqQwenStyleReasoning(model: string) {
+  return /qwen|compound/i.test(model);
 }
 
 type CompleteOptions = {
@@ -126,14 +131,15 @@ Return corrected JSON only — one object, no markdown.`;
     if (options.jsonMode) {
       body.response_format = { type: "json_object" };
     }
-    // Qwen/GPT-OSS on Groq dump <think> into content unless reasoning is off/hidden.
-    // Llama (e.g. llama-3.3-70b-versatile) rejects these params with 400.
-    if (
-      isGroqBaseUrl(this.options.baseUrl) &&
-      supportsGroqReasoningControls(this.options.model)
-    ) {
-      body.reasoning_effort = "none";
-      body.reasoning_format = "hidden";
+    // Groq reasoning params differ by family; Llama rejects them entirely (400).
+    if (isGroqBaseUrl(this.options.baseUrl)) {
+      if (isGroqGptOss(this.options.model)) {
+        // GPT-OSS only accepts low|medium|high (not none). Keep low for diary JSON.
+        body.reasoning_effort = "low";
+      } else if (isGroqQwenStyleReasoning(this.options.model)) {
+        body.reasoning_effort = "none";
+        body.reasoning_format = "hidden";
+      }
     }
 
     const response = await fetch(endpoint, {

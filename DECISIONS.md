@@ -78,12 +78,12 @@ Consequences:
 Date: 2026-08-04
 Status: Accepted
 Context: Phase 5 需要可切换的日记生成能力，且无 API Key 时系统仍可用。
-Decision: 统一 `AIProvider.analyzeMemory`；默认 Mock；有 Key 时用 OpenAI-compatible Chat Completions（JSON + 一次 schema 修复）。生成结果写入 `diary_versions`（source=ai）并更新 draft 字段，不自动发布。分析图仅用缩略图再压缩，不送原图。对 Groq 关闭 `response_format` JSON 模式；仅对支持推理控制的模型（Qwen / GPT-OSS / Compound）设 `reasoning_effort=none`，避免 thinking 污染输出；Llama 等不支持该参数的模型不发送。
+Decision: 统一 `AIProvider.analyzeMemory`；默认 Mock；有 Key 时用 OpenAI-compatible Chat Completions（JSON + 一次 schema 修复）。生成结果写入 `diary_versions`（source=ai）并更新 draft 字段，不自动发布。分析图仅用缩略图再压缩，不送原图。对 Groq 关闭 `response_format` JSON 模式；reasoning 按模型族区分：Qwen/Compound 用 `none`+`reasoning_format=hidden`；GPT-OSS 用 `low`（不支持 none / reasoning_format）；Llama 不发送。
 Reason: 符合 SPEC 的事实约束与可替换 Provider；保护隐私与稳定性。
 Consequences:
 - 编辑器可展示 `questionsToConfirm` / `inferredFacts` / 版本恢复。
 - 真实多模态依赖模型是否支持 image_url；默认 `AI_VISION=false`。
-- Groq 推荐日记模型：`llama-3.3-70b-versatile`（无 reasoning 参数）；Qwen/GPT-OSS 才带 reasoning 控制。
+- Groq 日记可试：`openai/gpt-oss-120b`（`reasoning_effort=low`）；Qwen 用 `none`；Llama 不带 reasoning 参数。
 
 ## Decision 008
 
