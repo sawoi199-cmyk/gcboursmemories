@@ -80,7 +80,7 @@ export async function POST(request: Request) {
     const supabase = createServiceClient();
     const { data: settings, error } = await supabase
       .from("relationship_settings")
-      .select("access_hash, password_version, owner_name, partner_name")
+      .select("access_hash, password_version, owner_name, partner_name, relationship_start_date")
       .eq("owner_id", ownerId)
       .maybeSingle();
 
@@ -112,6 +112,7 @@ export async function POST(request: Request) {
           relationship_title: "OURS",
           owner_name: ownerName,
           partner_name: partnerName,
+          relationship_start_date: settings?.relationship_start_date ?? "2024-12-20",
           access_hash: accessHash,
           password_version: passwordVersion,
         },

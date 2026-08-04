@@ -1,5 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { neighborsFromOrderedList } from "@/features/memories/published";
+import {
+  daysTogetherFromStartDate,
+  neighborsFromOrderedList,
+} from "@/features/memories/published";
+
+describe("daysTogetherFromStartDate", () => {
+  it("counts the meet day as day 1", () => {
+    expect(daysTogetherFromStartDate("2024-12-20", new Date(2024, 11, 20))).toBe(1);
+  });
+
+  it("counts inclusive days to 2026-08-04 from 2024-12-20", () => {
+    expect(daysTogetherFromStartDate("2024-12-20", new Date(2026, 7, 4))).toBe(593);
+  });
+});
 
 describe("neighborsFromOrderedList", () => {
   const items = [

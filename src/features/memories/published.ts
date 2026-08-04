@@ -105,6 +105,25 @@ function emptyHomeStats(): HomeStats {
   };
 }
 
+/** Inclusive calendar days: meet day = 第 1 天. Uses local date parts to avoid UTC off-by-one. */
+export function daysTogetherFromStartDate(
+  startIsoDate: string,
+  now: Date = new Date(),
+): number | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(startIsoDate.trim());
+  if (!match) return null;
+  const start = new Date(
+    Number(match[1]),
+    Number(match[2]) - 1,
+    Number(match[3]),
+  );
+  if (Number.isNaN(start.getTime())) return null;
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const diffDays = Math.floor((today.getTime() - start.getTime()) / 86_400_000);
+  if (diffDays < 0) return null;
+  return diffDays + 1;
+}
+
 function mapPhotoFromLink(
   link: PhotoLinkRow,
   gradientIndex: number,
@@ -231,10 +250,7 @@ export async function getHomeStats(): Promise<HomeStats> {
   let daysTogether: number | null = null;
   const start = settings?.relationship_start_date;
   if (start) {
-    const startMs = Date.parse(`${start}T00:00:00Z`);
-    if (!Number.isNaN(startMs)) {
-      daysTogether = Math.max(0, Math.floor((Date.now() - startMs) / 86_400_000));
-    }
+    daysTogether = daysTogetherFromStartDate(start);
   }
 
   return {

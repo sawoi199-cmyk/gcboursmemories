@@ -53,7 +53,7 @@ async function main() {
       relationship_title: "OURS",
       partner_name: "乖宝",
       owner_name: "臭宝",
-      relationship_start_date: "2023-01-01",
+      relationship_start_date: "2024-12-20",
       unlock_title: "PERSONAL MEMORY ARCHIVE",
       unlock_hint: "Enter the date only we remember.",
       default_diary_tone: "warm",

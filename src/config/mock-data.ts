@@ -1,7 +1,7 @@
 import type { EventPhoto, MemoryEvent } from "@/types/memory";
 
 export const mockStats = {
-  daysTogether: 867,
+  daysTogether: 593, // 2024-12-20 → 2026-08-04 inclusive
   photoCount: 128,
   placeCount: 18,
   memoryCount: 12,
