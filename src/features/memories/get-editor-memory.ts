@@ -33,6 +33,22 @@ export type EditorMemoryPayload = {
   chapterLabels: Record<ChapterId, string>;
 };
 
+type LinkedPhoto = {
+  id: string;
+  thumbnail_path: string | null;
+  original_filename: string;
+  taken_at: string | null;
+  width: number | null;
+  height: number | null;
+};
+
+type EventPhotoLink = {
+  photo_id: string;
+  sort_order: number;
+  role: string | null;
+  photos: LinkedPhoto | LinkedPhoto[] | null;
+};
+
 function gradientForIndex(index: number) {
   const presets = [
     "linear-gradient(145deg,#1b1d22,#b46a6a55,#f6f1ea)",
@@ -41,6 +57,76 @@ function gradientForIndex(index: number) {
     "linear-gradient(150deg,#3d4a5c,#e8ded4,#c6a15b)",
   ];
   return presets[index % presets.length];
+}
+
+async function loadEditorPhotos(
+  supabase: ReturnType<typeof createServiceClient>,
+  memoryId: string,
+): Promise<EditorPhoto[]> {
+  const { data: links, error: linksError } = await supabase
+    .from("event_photos")
+    .select(
+      "photo_id, sort_order, role, photos(id, thumbnail_path, original_filename, taken_at, width, height)",
+    )
+    .eq("event_id", memoryId)
+    .order("sort_order", { ascending: true });
+
+  if (linksError) {
+    throw new Error(linksError.message);
+  }
+
+  const typedLinks = (links ?? []) as EventPhotoLink[];
+  const thumbnailPaths = typedLinks
+    .map((link) => {
+      const photo = Array.isArray(link.photos) ? link.photos[0] : link.photos;
+      return photo?.thumbnail_path ?? null;
+    })
+    .filter((path): path is string => Boolean(path));
+
+  const signedByPath = new Map<string, string>();
+  if (thumbnailPaths.length > 0) {
+    const { data: signed } = await supabase.storage
+      .from("memory-thumbnails")
+      .createSignedUrls(thumbnailPaths, appConfig.signedUrlTtlSeconds);
+
+    for (const item of signed ?? []) {
+      if (item.path && item.signedUrl) {
+        signedByPath.set(item.path, item.signedUrl);
+      }
+    }
+  }
+
+  const photos: EditorPhoto[] = [];
+  for (const [index, link] of typedLinks.entries()) {
+    const photo = Array.isArray(link.photos) ? link.photos[0] : link.photos;
+    if (!photo) continue;
+
+    const orientation =
+      photo.width && photo.height
+        ? photo.height > photo.width
+          ? "portrait"
+          : photo.width === photo.height
+            ? "square"
+            : "landscape"
+        : "landscape";
+
+    photos.push({
+      id: photo.id,
+      photoId: photo.id,
+      label: photo.original_filename,
+      role: (link.role as PhotoRole) ?? "detail",
+      orientation,
+      gradient: gradientForIndex(index),
+      alt: photo.original_filename,
+      thumbnailPath: photo.thumbnail_path,
+      thumbnailUrl: photo.thumbnail_path
+        ? (signedByPath.get(photo.thumbnail_path) ?? null)
+        : null,
+      takenAt: photo.taken_at,
+    });
+  }
+
+  return photos;
 }
 
 export async function getEditorMemory(
@@ -62,77 +148,35 @@ export async function getEditorMemory(
     return null;
   }
 
-  const { data: links, error: linksError } = await supabase
-    .from("event_photos")
-    .select("photo_id, sort_order, role, photos(id, thumbnail_path, original_filename, taken_at, width, height)")
-    .eq("event_id", memoryId)
-    .order("sort_order", { ascending: true });
-
-  if (linksError) {
-    throw new Error(linksError.message);
-  }
-
-  const photos: EditorPhoto[] = [];
-
-  for (const [index, link] of (links ?? []).entries()) {
-    const photo = Array.isArray(link.photos) ? link.photos[0] : link.photos;
-    if (!photo) continue;
-
-    let thumbnailUrl: string | null = null;
-    if (photo.thumbnail_path) {
-      const { data: signed } = await supabase.storage
-        .from("memory-thumbnails")
-        .createSignedUrl(photo.thumbnail_path, appConfig.signedUrlTtlSeconds);
-      thumbnailUrl = signed?.signedUrl ?? null;
-    }
-
-    const orientation =
-      photo.width && photo.height
-        ? photo.height > photo.width
-          ? "portrait"
-          : photo.width === photo.height
-            ? "square"
-            : "landscape"
-        : "landscape";
-
-    photos.push({
-      id: photo.id,
-      photoId: photo.id,
-      label: photo.original_filename,
-      role: (link.role as PhotoRole) ?? "detail",
-      orientation,
-      gradient: gradientForIndex(index),
-      alt: photo.original_filename,
-      thumbnailPath: photo.thumbnail_path,
-      thumbnailUrl,
-      takenAt: photo.taken_at,
-    });
-  }
-
-  const { data: siblings } = await supabase
-    .from("memory_events")
-    .select("id, title, event_date")
-    .eq("owner_id", ownerId)
-    .eq("status", "draft")
-    .neq("id", memoryId)
-    .order("event_date", { ascending: false })
-    .limit(20);
-
-  const { data: diaryVersions } = await supabase
-    .from("diary_versions")
-    .select("id, title, one_line, source, created_at")
-    .eq("event_id", memoryId)
-    .order("created_at", { ascending: false })
-    .limit(20);
-
-  const { data: settings } = await supabase
-    .from("relationship_settings")
-    .select("chapter_labels")
-    .eq("owner_id", ownerId)
-    .maybeSingle();
+  // Photos (+ batch signed URLs) run in parallel with siblings / versions / settings.
+  const [photos, siblingsResult, diaryVersionsResult, settingsResult] =
+    await Promise.all([
+      loadEditorPhotos(supabase, memoryId),
+      supabase
+        .from("memory_events")
+        .select("id, title, event_date")
+        .eq("owner_id", ownerId)
+        .eq("status", "draft")
+        .neq("id", memoryId)
+        .order("event_date", { ascending: false })
+        .limit(20),
+      supabase
+        .from("diary_versions")
+        .select("id, title, one_line, source, created_at")
+        .eq("event_id", memoryId)
+        .order("created_at", { ascending: false })
+        .limit(20),
+      supabase
+        .from("relationship_settings")
+        .select("chapter_labels")
+        .eq("owner_id", ownerId)
+        .maybeSingle(),
+    ]);
 
   const chapterLabels = resolveChapterLabels(
-    (settings?.chapter_labels as Partial<Record<ChapterId, string>> | null) ?? null,
+    (settingsResult.data?.chapter_labels as Partial<
+      Record<ChapterId, string>
+    > | null) ?? null,
   );
 
   return {
@@ -152,12 +196,12 @@ export async function getEditorMemory(
       userNote: event.user_note ?? "",
     },
     photos,
-    siblingDrafts: (siblings ?? []).map((item) => ({
+    siblingDrafts: (siblingsResult.data ?? []).map((item) => ({
       id: item.id,
       title: item.title,
       eventDate: item.event_date,
     })),
-    diaryVersions: diaryVersions ?? [],
+    diaryVersions: diaryVersionsResult.data ?? [],
     chapterLabels,
   };
 }
