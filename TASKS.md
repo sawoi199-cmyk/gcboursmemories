@@ -35,3 +35,5 @@ Phase 8 — 测试与部署（已落地骨架；生产部署需你在 Vercel/Sup
 - 性能：`getEditorMemory` 缩略图改 `createSignedUrls` 批量签名，并与 siblings/versions/settings 并行查询，缩短打开编辑页等待
 - 访问模型：体验与 Studio 共用站点密码 Cookie；`chapter-labels` 插入默认称呼已对齐 臭宝/乖宝
 - Final review：middleware 校验 DB `password_version`；`requireSiteSession` DB error→503；published/signed-original owner 作用域；logout 检查 response.ok
+- UX：上传向导去掉未接线的「补充真实记忆 / 假预览」步骤（Decision 012）；记忆与 AI 只在编辑器填写
+- 文案：去掉前台/Studio 可见的 Phase 开发期说明（今日页、上传向导、设置页）

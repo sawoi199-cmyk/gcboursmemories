@@ -61,7 +61,7 @@ export default async function StudioSettingsPage() {
         <Row label="默认日记语气" value="温柔日记" />
         <Row
           label="Supabase"
-          value={supabaseReady ? "已配置环境变量" : "未配置（本地可用 Mock UI）"}
+          value={supabaseReady ? "已配置" : "未配置"}
         />
         <Row label="原图存储" value="Google Drive via GAS" />
         <Row label="缩略图存储" value="Supabase 私有桶 memory-thumbnails" />
@@ -98,8 +98,8 @@ export default async function StudioSettingsPage() {
         </div>
 
         <p className="mt-4 text-xs leading-6 text-muted-ours">
-          部署步骤见 <code className="rounded bg-background px-1">docs/phase-2-setup.md</code>
-          ，脚本模板在 <code className="rounded bg-background px-1">gas/OursDriveGateway.gs</code>
+          部署步骤见仓库文档 <code className="rounded bg-background px-1">docs/deploy.md</code>
+          ，GAS 脚本模板在 <code className="rounded bg-background px-1">gas/OursDriveGateway.gs</code>
           。
         </p>
       </div>

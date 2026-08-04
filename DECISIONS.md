@@ -129,3 +129,14 @@ Consequences:
 - 生产必须配置 `SITE_OWNER_ID` 与 `SESSION_SIGNING_SECRET`。
 - 应用层必须始终带 `owner_id = SITE_OWNER_ID` 过滤，因 Studio 走 service role 绕过 RLS。
 - `docs/deploy.md`、`.env.example`、e2e 冒烟已更新；不含关系标题/默认日记语气编辑。
+
+## Decision 012
+
+Date: 2026-08-04
+Status: Accepted
+Context: 上传向导「补充真实记忆」步骤只写本地 state，不落库也不传编辑器；用户填完后进编辑器仍要重填，体验重复且误导。
+Decision: 从 `/studio/upload` 去掉「补充记忆」与假版式预览步骤。向导只保留「上传照片 → 确认事件 → 进入编辑器」；真实记忆、排除项、语气与 AI 生成统一在记忆编辑器完成。
+Reason: 消除无效表单；编辑器已有完整 AI 输入与持久化，无需在向导再维护一套未接线字段。
+Consequences:
+- 上传流程更短；SPEC 中「向导内补充记忆再生成」改为「编辑器内补充并生成」。
+- 向导不再预览日记/版式。

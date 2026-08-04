@@ -4,14 +4,11 @@ import Link from "next/link";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { FadeIn } from "@/components/motion/fade-in";
 import { buttonVariants } from "@/components/ui/button";
-import { memoryTemplates, MemoryLayoutRenderer } from "@/features/templates/registry";
 import { cn } from "@/lib/utils";
 
 const steps = [
   { id: 1, title: "上传照片" },
   { id: 2, title: "确认事件" },
-  { id: 3, title: "补充记忆" },
-  { id: 4, title: "生成日记与设计" },
 ] as const;
 
 const CONCURRENCY = 3;
@@ -66,46 +63,11 @@ export function UploadWizard() {
   const [items, setItems] = useState<UploadItem[]>([]);
   const [events, setEvents] = useState<DraftEvent[]>([]);
   const [groupingError, setGroupingError] = useState<string | null>(null);
-  const [note, setNote] = useState("");
-  const [exclude, setExclude] = useState("");
-  const [tone, setTone] = useState("温柔日记");
-  const [templateId, setTemplateId] = useState("editorial-hero");
   const [busy, setBusy] = useState(false);
 
   const donePhotos = useMemo(
     () => items.filter((item) => item.status === "done" && item.photoId),
     [items],
-  );
-
-  const previewMemory = useMemo(
-    () => ({
-      id: events[0]?.id ?? "upload-preview",
-      slug: events[0]?.slug ?? "upload-preview",
-      title: events[0]?.title ?? "新的回忆草稿",
-      oneLine: note.trim() || "补充一句真实记忆后，AI 会生成日记草稿。",
-      diaryBody:
-        note.trim().length > 0
-          ? `${note.trim()}\n\n（Phase 3：真实上传已接通；AI 日记仍为 Mock，Phase 5 再接入。）`
-          : "（请先补充真实记忆）",
-      eventDate: events[0]?.eventDate ?? new Date().toISOString().slice(0, 10),
-      placeName: null,
-      templateId,
-      status: "draft" as const,
-    }),
-    [events, note, templateId],
-  );
-
-  const previewPhotos = useMemo(
-    () =>
-      donePhotos.slice(0, 6).map((item, index) => ({
-        id: item.photoId ?? item.localId,
-        label: item.file.name,
-        role: index === 0 ? ("cover" as const) : ("detail" as const),
-        orientation: "landscape" as const,
-        gradient: `linear-gradient(145deg, #1b1d22, #b46a6a55, #f6f1ea)`,
-        alt: item.file.name,
-      })),
-    [donePhotos],
   );
 
   const addFiles = useCallback((fileList: FileList | File[]) => {
@@ -258,11 +220,11 @@ export function UploadWizard() {
         <p className="text-xs tracking-[0.2em] text-gold uppercase">Upload</p>
         <h1 className="mt-2 font-serif text-3xl text-ink">上传回忆</h1>
         <p className="mt-2 text-sm text-muted-ours">
-          Phase 3：原图经 GAS 进 Google Drive，缩略图进 Supabase。需已登录且 migration 已执行。
+          上传并确认事件后进入编辑器，在那里补充真实记忆并生成日记草稿。
         </p>
       </FadeIn>
 
-      <ol className="mt-8 grid gap-2 sm:grid-cols-4">
+      <ol className="mt-8 grid gap-2 sm:grid-cols-2">
         {steps.map((item) => (
           <li key={item.id}>
             <button
@@ -391,13 +353,22 @@ export function UploadWizard() {
           <div className="space-y-4">
             <h2 className="font-serif text-xl text-ink">确认事件分组</h2>
             <p className="text-sm text-muted-ours">
-              已按日期/时间/GPS 规则生成候选。可先合并或拆分（本页为草稿预览，保存逻辑在编辑器）。
+              已按日期/时间/GPS 规则生成候选。可先合并或拆分；补充记忆与 AI
+              生成在编辑器完成。
             </p>
             <div className="flex gap-2">
-              <button type="button" className={cn(buttonVariants({ variant: "outline", size: "sm" }))} onClick={mergeFirstTwo}>
+              <button
+                type="button"
+                className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+                onClick={mergeFirstTwo}
+              >
                 合并前两组
               </button>
-              <button type="button" className={cn(buttonVariants({ variant: "outline", size: "sm" }))} onClick={splitFirst}>
+              <button
+                type="button"
+                className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+                onClick={splitFirst}
+              >
                 拆分第一组
               </button>
             </div>
@@ -417,101 +388,22 @@ export function UploadWizard() {
             </ul>
           </div>
         ) : null}
-
-        {step === 3 ? (
-          <div className="space-y-4">
-            <h2 className="font-serif text-xl text-ink">补充真实记忆</h2>
-            <label className="block text-sm text-ink" htmlFor="user-note">
-              这一天发生了什么？
-            </label>
-            <textarea
-              id="user-note"
-              value={note}
-              onChange={(event) => setNote(event.target.value)}
-              rows={4}
-              className="w-full rounded-xl border border-line bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            />
-            <label className="block text-sm text-ink" htmlFor="exclude">
-              有什么内容不要写进日记？
-            </label>
-            <input
-              id="exclude"
-              value={exclude}
-              onChange={(event) => setExclude(event.target.value)}
-              className="w-full rounded-xl border border-line bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            />
-            <label className="block text-sm text-ink" htmlFor="tone">
-              希望用什么语气？
-            </label>
-            <select
-              id="tone"
-              value={tone}
-              onChange={(event) => setTone(event.target.value)}
-              className="w-full rounded-xl border border-line bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              {["温柔日记", "电影旁白", "轻松幽默", "简短记录", "旅行杂志", "写给未来"].map(
-                (item) => (
-                  <option key={item} value={item}>
-                    {item}
-                  </option>
-                ),
-              )}
-            </select>
-          </div>
-        ) : null}
-
-        {step === 4 ? (
-          <div className="space-y-6">
-            <div>
-              <h2 className="font-serif text-xl text-ink">预览设计</h2>
-              <p className="mt-2 text-sm text-muted-ours">
-                语气：{tone}
-                {exclude ? ` · 已排除：${exclude}` : ""} · AI 生成将在 Phase 5 接通
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {memoryTemplates.map((template) => (
-                <button
-                  key={template.id}
-                  type="button"
-                  onClick={() => setTemplateId(template.id)}
-                  className={cn(
-                    "rounded-full border px-3 py-1.5 text-xs",
-                    templateId === template.id
-                      ? "border-ink bg-ink text-paper"
-                      : "border-line text-muted-ours",
-                  )}
-                >
-                  {template.name}
-                </button>
-              ))}
-            </div>
-            {previewPhotos.length > 0 ? (
-              <MemoryLayoutRenderer
-                memory={previewMemory}
-                photos={previewPhotos}
-                mode="preview"
-              />
-            ) : (
-              <p className="text-sm text-muted-ours">上传成功后可预览版式。</p>
-            )}
-          </div>
-        ) : null}
       </div>
 
       <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
         <button
           type="button"
           disabled={step === 1}
-          onClick={() => setStep((value) => Math.max(1, value - 1))}
+          onClick={() => setStep(1)}
           className={cn(buttonVariants({ variant: "outline" }))}
         >
           上一步
         </button>
-        {step < 4 ? (
+        {step === 1 ? (
           <button
             type="button"
-            onClick={() => setStep((value) => Math.min(4, value + 1))}
+            disabled={events.length === 0}
+            onClick={() => setStep(2)}
             className={cn(buttonVariants())}
           >
             下一步
