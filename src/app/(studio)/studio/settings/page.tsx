@@ -7,7 +7,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { resolveChapterLabels, type ChapterId } from "@/config/chapters";
 import { mockRelationship } from "@/config/mock-data";
 import { getSiteOwnerId } from "@/lib/config/site-owner";
-import { getDriveConnectionStatus, isDriveConfigured } from "@/lib/google-drive/gas-client";
+import { getDriveConfigStatus, isDriveConfigured } from "@/lib/google-drive/gas-client";
 import { createServiceClient } from "@/lib/supabase/admin";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { cn } from "@/lib/utils";
@@ -16,7 +16,7 @@ const DEFAULT_OWNER_NAME = "臭宝";
 const DEFAULT_PARTNER_NAME = "乖宝";
 
 export default async function StudioSettingsPage() {
-  const driveStatus = await getDriveConnectionStatus();
+  const driveStatus = await getDriveConfigStatus();
   const supabaseReady = isSupabaseConfigured();
 
   let passwordSet = false;
@@ -78,13 +78,13 @@ export default async function StudioSettingsPage() {
           <li>Web App URL：{driveStatus.gasUrlConfigured ? "已配置" : "缺失"}</li>
           <li>共享密钥：{driveStatus.sharedSecretConfigured ? "已配置" : "缺失"}</li>
           <li>根文件夹 ID：{driveStatus.rootFolderConfigured ? "已配置" : "可选/缺失"}</li>
-          <li>连通性：{driveStatus.reachable ? "可达" : "未连通"}</li>
+          <li>连通性：打开页不自动探测（避免 GAS 冷启动拖慢设置页）</li>
         </ul>
 
         <div className="mt-5 flex flex-wrap gap-3">
           {isDriveConfigured() ? (
             <a href="/api/drive/status" className={cn(buttonVariants({ variant: "outline" }))}>
-              查看 JSON 状态
+              检查连通性（JSON）
             </a>
           ) : (
             <button

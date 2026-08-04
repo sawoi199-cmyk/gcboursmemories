@@ -115,7 +115,7 @@ export async function fetchDriveFile(fileId: string) {
   return callGas("getFile", { fileId });
 }
 
-export async function getDriveConnectionStatus(): Promise<DriveConnectionStatus> {
+export async function getDriveConfigStatus(): Promise<DriveConnectionStatus> {
   const gasUrlConfigured = Boolean(process.env.GAS_WEB_APP_URL);
   const sharedSecretConfigured = Boolean(process.env.GAS_SHARED_SECRET);
   const rootFolderConfigured = Boolean(process.env.GAS_ROOT_FOLDER_ID);
@@ -131,22 +131,37 @@ export async function getDriveConnectionStatus(): Promise<DriveConnectionStatus>
     };
   }
 
+  return {
+    gasUrlConfigured,
+    sharedSecretConfigured,
+    rootFolderConfigured,
+    // Not probed here — live ping is slow (GAS cold start). Use /api/drive/status on demand.
+    reachable: false,
+    message: rootFolderConfigured
+      ? "环境变量已配置。连通性请点下方「检查连通性」确认（会请求 GAS，可能需几秒）。"
+      : "环境变量已配置。建议设置 GAS_ROOT_FOLDER_ID。连通性请点「检查连通性」确认。",
+  };
+}
+
+export async function getDriveConnectionStatus(): Promise<DriveConnectionStatus> {
+  const base = await getDriveConfigStatus();
+
+  if (!base.gasUrlConfigured || !base.sharedSecretConfigured) {
+    return base;
+  }
+
   try {
     await pingDriveGateway();
     return {
-      gasUrlConfigured,
-      sharedSecretConfigured,
-      rootFolderConfigured,
+      ...base,
       reachable: true,
-      message: rootFolderConfigured
-        ? "GAS Drive 网关可达，可用于 Phase 3 上传。"
+      message: base.rootFolderConfigured
+        ? "GAS Drive 网关可达，可用于上传。"
         : "GAS 网关可达。建议设置 GAS_ROOT_FOLDER_ID（OURS 根文件夹 ID）。",
     };
   } catch (error) {
     return {
-      gasUrlConfigured,
-      sharedSecretConfigured,
-      rootFolderConfigured,
+      ...base,
       reachable: false,
       message:
         error instanceof Error

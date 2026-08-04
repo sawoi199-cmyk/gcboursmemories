@@ -43,7 +43,7 @@ export function UnlockScreen() {
       window.setTimeout(() => {
         router.push("/");
         router.refresh();
-      }, 1000);
+      }, 450);
     } catch {
       setStatus("error");
       setError("网络错误，请重试。");

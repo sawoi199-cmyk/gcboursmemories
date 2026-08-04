@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   assertSessionMatchesVersion,
+  invalidatePasswordVersionCache,
   requireSiteSession,
 } from "@/lib/security/require-site-session";
 
@@ -58,6 +59,7 @@ describe("requireSiteSession", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    invalidatePasswordVersionCache();
     mockIsSupabaseConfigured.mockReturnValue(true);
     mockGetSiteOwnerId.mockReturnValue(OWNER_ID);
     mockCookies.mockResolvedValue({

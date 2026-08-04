@@ -1,6 +1,7 @@
 export {
   ensureDriveFolders,
   fetchDriveFile,
+  getDriveConfigStatus,
   getDriveConnectionStatus,
   getDriveRootFolderId,
   getGasSharedSecret,

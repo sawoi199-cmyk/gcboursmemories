@@ -1,12 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { getSiteOwnerId } from "@/lib/config/site-owner";
 import {
   PARTNER_COOKIE_NAME,
   partnerCookieOptions,
   verifyPartnerSessionToken,
 } from "@/lib/security/partner-session";
-import { createServiceClient } from "@/lib/supabase/admin";
-import { isSupabaseConfigured } from "@/lib/supabase/env";
 
 function isExperiencePath(pathname: string) {
   if (pathname === "/unlock") return false;
@@ -33,49 +30,16 @@ function redirectToUnlock(request: NextRequest, clearCookie: boolean) {
 }
 
 /**
- * HMAC + expiry + DB password_version gate.
- * Fail closed when SITE_OWNER_ID / Supabase / service role / DB query is unavailable.
+ * Fast gate: HMAC + expiry only (no Supabase round-trip).
+ * password_version is enforced on APIs via requireSiteSession().
  */
 async function hasValidSiteSession(request: NextRequest): Promise<boolean> {
   const token = request.cookies.get(PARTNER_COOKIE_NAME)?.value;
   if (!token) {
     return false;
   }
-
   const verified = await verifyPartnerSessionToken(token);
-  if (!verified.ok) {
-    return false;
-  }
-
-  if (!isSupabaseConfigured()) {
-    return false;
-  }
-
-  let ownerId: string;
-  try {
-    ownerId = getSiteOwnerId();
-  } catch {
-    return false;
-  }
-
-  try {
-    const admin = createServiceClient();
-    const { data, error } = await admin
-      .from("relationship_settings")
-      .select("password_version")
-      .eq("owner_id", ownerId)
-      .maybeSingle();
-
-    if (error) {
-      return false;
-    }
-
-    const currentVersion = data?.password_version ?? 0;
-    return verified.pwdVersion === currentVersion;
-  } catch {
-    // Missing service role key or Edge client failure → fail closed
-    return false;
-  }
+  return verified.ok;
 }
 
 export async function middleware(request: NextRequest) {

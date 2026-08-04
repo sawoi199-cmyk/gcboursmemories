@@ -7,7 +7,7 @@ import {
 import { tryGetSiteOwnerId } from "@/lib/config/site-owner";
 import { createServiceClient } from "@/lib/supabase/admin";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
-import type { EventPhoto, MemoryEvent } from "@/types/memory";
+import type { EventPhoto, MemoryEvent, MemoryStatus } from "@/types/memory";
 
 export type PublishedMemory = MemoryEvent & {
   publishedAt: string | null;
@@ -20,12 +20,58 @@ export type PublishedMemory = MemoryEvent & {
   >;
 };
 
+export type PublishedMemoryNav = {
+  slug: string;
+  title: string;
+};
+
 export type HomeStats = {
   daysTogether: number | null;
   memoryCount: number;
   placeCount: number;
   photoCount: number;
   relationshipStartDate: string | null;
+};
+
+type EventRow = {
+  id: string;
+  slug: string;
+  title: string;
+  subtitle: string | null;
+  one_line: string | null;
+  diary_body: string | null;
+  event_date: string;
+  place_name: string | null;
+  template_id: string;
+  status: MemoryStatus;
+  mood: string | null;
+  chapter: string | null;
+  published_at: string | null;
+};
+
+type PhotoLinkRow = {
+  event_id?: string;
+  photo_id: string;
+  role: string | null;
+  sort_order: number | null;
+  photos:
+    | {
+        id: string;
+        original_filename: string;
+        thumbnail_path: string | null;
+        drive_file_id: string | null;
+        width: number | null;
+        height: number | null;
+      }
+    | {
+        id: string;
+        original_filename: string;
+        thumbnail_path: string | null;
+        drive_file_id: string | null;
+        width: number | null;
+        height: number | null;
+      }[]
+    | null;
 };
 
 function gradientForIndex(index: number) {
@@ -38,9 +84,11 @@ function gradientForIndex(index: number) {
   return presets[index % presets.length];
 }
 
-async function signThumbnail(path: string | null) {
-  if (!path || !isSupabaseConfigured()) return null;
-  const supabase = createServiceClient();
+async function signThumbnail(
+  path: string | null,
+  supabase: ReturnType<typeof createServiceClient>,
+) {
+  if (!path) return null;
   const { data } = await supabase.storage
     .from("memory-thumbnails")
     .createSignedUrl(path, appConfig.signedUrlTtlSeconds);
@@ -54,6 +102,91 @@ function emptyHomeStats(): HomeStats {
     placeCount: 0,
     photoCount: 0,
     relationshipStartDate: null,
+  };
+}
+
+function mapPhotoFromLink(
+  link: PhotoLinkRow,
+  gradientIndex: number,
+  thumbnailUrl: string | null,
+): PublishedMemory["photos"][number] | null {
+  const photo = Array.isArray(link.photos) ? link.photos[0] : link.photos;
+  if (!photo) return null;
+  const width = photo.width ?? 1200;
+  const height = photo.height ?? 1600;
+  const orientation =
+    width === height ? "square" : width > height ? "landscape" : "portrait";
+  return {
+    id: photo.id,
+    photoId: photo.id,
+    label: photo.original_filename,
+    role: (link.role as EventPhoto["role"]) ?? "detail",
+    orientation: orientation as EventPhoto["orientation"],
+    gradient: gradientForIndex(gradientIndex),
+    alt: photo.original_filename,
+    thumbnailUrl,
+    thumbnailPath: photo.thumbnail_path,
+    driveFileId: photo.drive_file_id,
+  };
+}
+
+function mapEventRow(event: EventRow, photos: PublishedMemory["photos"]): PublishedMemory {
+  return {
+    id: event.id,
+    slug: event.slug,
+    title: event.title,
+    subtitle: event.subtitle,
+    oneLine: event.one_line ?? "",
+    diaryBody: event.diary_body ?? "",
+    eventDate: event.event_date,
+    placeName: event.place_name,
+    templateId: event.template_id,
+    status: event.status,
+    mood: event.mood ?? undefined,
+    tags: undefined,
+    chapter: event.chapter ?? undefined,
+    publishedAt: event.published_at,
+    photos,
+  };
+}
+
+async function loadPhotosForEvent(
+  supabase: ReturnType<typeof createServiceClient>,
+  eventId: string,
+  gradientBase: number,
+): Promise<PublishedMemory["photos"]> {
+  const { data: links } = await supabase
+    .from("event_photos")
+    .select(
+      "photo_id, role, sort_order, photos(id, original_filename, thumbnail_path, drive_file_id, width, height)",
+    )
+    .eq("event_id", eventId)
+    .order("sort_order", { ascending: true });
+
+  const rows = (links ?? []) as PhotoLinkRow[];
+  const signed = await Promise.all(
+    rows.map(async (link, photoIndex) => {
+      const photo = Array.isArray(link.photos) ? link.photos[0] : link.photos;
+      const thumbnailUrl = await signThumbnail(photo?.thumbnail_path ?? null, supabase);
+      return mapPhotoFromLink(link, gradientBase + photoIndex, thumbnailUrl);
+    }),
+  );
+  return signed.filter((photo): photo is NonNullable<typeof photo> => Boolean(photo));
+}
+
+/** Pure helper for prev/next from a lightweight ordered list. */
+export function neighborsFromOrderedList<T extends { slug: string }>(
+  items: T[],
+  slug: string,
+): { index: number; prev: T | null; next: T | null } {
+  const index = items.findIndex((item) => item.slug === slug);
+  if (index === -1) {
+    return { index: -1, prev: null, next: null };
+  }
+  return {
+    index,
+    prev: index > 0 ? (items[index - 1] ?? null) : null,
+    next: index < items.length - 1 ? (items[index + 1] ?? null) : null,
   };
 }
 
@@ -132,69 +265,98 @@ export async function getPublishedMemories(): Promise<PublishedMemory[]> {
   if (error) throw new Error(error.message);
   if (!events?.length) return [];
 
-  const result: PublishedMemory[] = [];
-  for (const [index, event] of events.entries()) {
-    const { data: links } = await supabase
-      .from("event_photos")
-      .select(
-        "photo_id, role, sort_order, photos(id, original_filename, thumbnail_path, drive_file_id, width, height)",
-      )
-      .eq("event_id", event.id)
-      .order("sort_order", { ascending: true });
+  const eventRows = events as EventRow[];
+  const eventIds = eventRows.map((event) => event.id);
 
-    const photos = [];
-    for (const [photoIndex, link] of (links ?? []).entries()) {
-      const photo = Array.isArray(link.photos) ? link.photos[0] : link.photos;
-      if (!photo) continue;
-      const thumbnailUrl = await signThumbnail(photo.thumbnail_path);
-      const width = photo.width ?? 1200;
-      const height = photo.height ?? 1600;
-      const orientation =
-        width === height ? "square" : width > height ? "landscape" : "portrait";
-      photos.push({
-        id: photo.id,
-        photoId: photo.id,
-        label: photo.original_filename,
-        role: (link.role as EventPhoto["role"]) ?? "detail",
-        orientation: orientation as EventPhoto["orientation"],
-        gradient: gradientForIndex(index + photoIndex),
-        alt: photo.original_filename,
-        thumbnailUrl,
-        thumbnailPath: photo.thumbnail_path,
-        driveFileId: photo.drive_file_id,
-      });
-    }
+  const { data: allLinks, error: linksError } = await supabase
+    .from("event_photos")
+    .select(
+      "event_id, photo_id, role, sort_order, photos(id, original_filename, thumbnail_path, drive_file_id, width, height)",
+    )
+    .in("event_id", eventIds)
+    .order("sort_order", { ascending: true });
 
-    result.push({
-      id: event.id,
-      slug: event.slug,
-      title: event.title,
-      subtitle: event.subtitle,
-      oneLine: event.one_line ?? "",
-      diaryBody: event.diary_body ?? "",
-      eventDate: event.event_date,
-      placeName: event.place_name,
-      templateId: event.template_id,
-      status: event.status,
-      mood: event.mood ?? undefined,
-      tags: undefined,
-      chapter: event.chapter ?? undefined,
-      publishedAt: event.published_at,
-      photos,
-    });
+  if (linksError) throw new Error(linksError.message);
+
+  const linksByEvent = new Map<string, PhotoLinkRow[]>();
+  for (const link of (allLinks ?? []) as PhotoLinkRow[]) {
+    if (!link.event_id) continue;
+    const list = linksByEvent.get(link.event_id) ?? [];
+    list.push(link);
+    linksByEvent.set(link.event_id, list);
   }
 
-  return result;
+  const pathsToSign = new Set<string>();
+  for (const links of linksByEvent.values()) {
+    for (const link of links) {
+      const photo = Array.isArray(link.photos) ? link.photos[0] : link.photos;
+      if (photo?.thumbnail_path) pathsToSign.add(photo.thumbnail_path);
+    }
+  }
+
+  const signedEntries = await Promise.all(
+    [...pathsToSign].map(async (path) => [path, await signThumbnail(path, supabase)] as const),
+  );
+  const signedByPath = new Map(signedEntries);
+
+  return eventRows.map((event, index) => {
+    const links = linksByEvent.get(event.id) ?? [];
+    const photos = links
+      .map((link, photoIndex) => {
+        const photo = Array.isArray(link.photos) ? link.photos[0] : link.photos;
+        const thumbnailUrl = photo?.thumbnail_path
+          ? (signedByPath.get(photo.thumbnail_path) ?? null)
+          : null;
+        return mapPhotoFromLink(link, index + photoIndex, thumbnailUrl);
+      })
+      .filter((photo): photo is NonNullable<typeof photo> => Boolean(photo));
+    return mapEventRow(event, photos);
+  });
 }
 
-export async function getPublishedMemoryBySlug(slug: string) {
-  const all = await getPublishedMemories();
-  const index = all.findIndex((item) => item.slug === slug);
-  if (index === -1) return null;
+export async function getPublishedMemoryBySlug(slug: string): Promise<{
+  memory: PublishedMemory;
+  prev: PublishedMemoryNav | null;
+  next: PublishedMemoryNav | null;
+} | null> {
+  if (!isSupabaseConfigured()) return null;
+
+  const ownerId = tryGetSiteOwnerId();
+  if (!ownerId) return null;
+  const supabase = createServiceClient();
+
+  const { data: event, error } = await supabase
+    .from("memory_events")
+    .select(
+      "id, slug, title, subtitle, one_line, diary_body, event_date, place_name, template_id, status, mood, chapter, published_at",
+    )
+    .eq("owner_id", ownerId)
+    .eq("slug", slug)
+    .eq("status", "published")
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  if (!event) return null;
+
+  const eventRow = event as EventRow;
+  const photos = await loadPhotosForEvent(supabase, eventRow.id, 0);
+  const memory = mapEventRow(eventRow, photos);
+
+  // Lightweight neighbor list: no photos / no signed URLs.
+  const { data: navRows } = await supabase
+    .from("memory_events")
+    .select("slug, title, event_date, published_at")
+    .eq("owner_id", ownerId)
+    .eq("status", "published")
+    .order("event_date", { ascending: true })
+    .order("published_at", { ascending: true });
+
+  const { prev, next } = neighborsFromOrderedList(navRows ?? [], slug);
+
   return {
-    memory: all[index],
-    prev: index > 0 ? all[index - 1] : null,
-    next: index < all.length - 1 ? all[index + 1] : null,
+    memory,
+    prev: prev ? { slug: prev.slug, title: prev.title } : null,
+    next: next ? { slug: next.slug, title: next.title } : null,
   };
 }
 

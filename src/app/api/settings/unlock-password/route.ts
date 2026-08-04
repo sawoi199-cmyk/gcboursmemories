@@ -5,7 +5,7 @@ import {
   PARTNER_COOKIE_NAME,
   partnerCookieOptions,
 } from "@/lib/security/partner-session";
-import { requireSiteSession } from "@/lib/security/require-site-session";
+import { requireSiteSession, invalidatePasswordVersionCache } from "@/lib/security/require-site-session";
 import { createServiceClient } from "@/lib/supabase/admin";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 
@@ -58,6 +58,7 @@ export async function POST(request: Request) {
       if (error) {
         return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
       }
+      invalidatePasswordVersionCache();
     } else {
       const { error } = await admin.from("relationship_settings").insert({
         owner_id: session.ownerId,
@@ -70,6 +71,7 @@ export async function POST(request: Request) {
       if (error) {
         return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
       }
+      invalidatePasswordVersionCache();
     }
 
     const response = NextResponse.json({

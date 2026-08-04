@@ -7,12 +7,58 @@ import {
 import { createServiceClient } from "@/lib/supabase/admin";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 
+const PASSWORD_VERSION_CACHE_TTL_MS = 60_000;
+
+let passwordVersionCache: {
+  ownerId: string;
+  version: number;
+  expiresAt: number;
+} | null = null;
+
 export function assertSessionMatchesVersion(
   tokenPwdVersion: number,
   dbPasswordVersion: number | null | undefined,
 ): boolean {
   const currentVersion = dbPasswordVersion ?? 0;
   return tokenPwdVersion === currentVersion;
+}
+
+/** Call after password change so the next API check reads fresh version. */
+export function invalidatePasswordVersionCache() {
+  passwordVersionCache = null;
+}
+
+async function readPasswordVersion(ownerId: string): Promise<
+  | { ok: true; version: number }
+  | { ok: false; status: 503; message: string }
+> {
+  const now = Date.now();
+  if (
+    passwordVersionCache &&
+    passwordVersionCache.ownerId === ownerId &&
+    passwordVersionCache.expiresAt > now
+  ) {
+    return { ok: true, version: passwordVersionCache.version };
+  }
+
+  const admin = createServiceClient();
+  const { data, error } = await admin
+    .from("relationship_settings")
+    .select("password_version")
+    .eq("owner_id", ownerId)
+    .maybeSingle();
+
+  if (error) {
+    return { ok: false, status: 503, message: "Unable to verify session" };
+  }
+
+  const version = data?.password_version ?? 0;
+  passwordVersionCache = {
+    ownerId,
+    version,
+    expiresAt: now + PASSWORD_VERSION_CACHE_TTL_MS,
+  };
+  return { ok: true, version };
 }
 
 export async function requireSiteSession(): Promise<
@@ -40,21 +86,14 @@ export async function requireSiteSession(): Promise<
     return { ok: false, status: 401, message: "Unauthorized" };
   }
 
-  const admin = createServiceClient();
-  const { data, error } = await admin
-    .from("relationship_settings")
-    .select("password_version")
-    .eq("owner_id", ownerId)
-    .maybeSingle();
-
-  if (error) {
-    return { ok: false, status: 503, message: "Unable to verify session" };
+  const versionResult = await readPasswordVersion(ownerId);
+  if (!versionResult.ok) {
+    return versionResult;
   }
 
-  const currentVersion = data?.password_version ?? 0;
-  if (!assertSessionMatchesVersion(verified.pwdVersion, currentVersion)) {
+  if (!assertSessionMatchesVersion(verified.pwdVersion, versionResult.version)) {
     return { ok: false, status: 401, message: "Unauthorized" };
   }
 
-  return { ok: true, ownerId, pwdVersion: currentVersion };
+  return { ok: true, ownerId, pwdVersion: versionResult.version };
 }
