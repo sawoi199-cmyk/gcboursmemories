@@ -35,6 +35,7 @@ Phase 8 — 测试与部署（已落地骨架；生产部署需你在 Vercel/Sup
 - Bugfix：Studio 编辑器「故事章节」下拉曾写死默认文案，且误读 `site_settings`；现从 `relationship_settings.chapter_labels` 经 `getEditorMemory` 注入 `chapterLabels`
 - 性能：`getEditorMemory` 缩略图改 `createSignedUrls` 批量签名，并与 siblings/versions/settings 并行查询，缩短打开编辑页等待
 - 性能：前台时间线/故事封面批量签名 + 60s `unstable_cache`（发布/保存失效）+ `loading.tsx` 骨架（Decision 013）
+- 性能：时间线分页「加载更多」（每页 20）+ Instagram 式日历按日筛选（Decision 014）
 - 访问模型：体验与 Studio 共用站点密码 Cookie；`chapter-labels` 插入默认称呼已对齐 臭宝/乖宝
 - Final review：middleware 校验 DB `password_version`；`requireSiteSession` DB error→503；published/signed-original owner 作用域；logout 检查 response.ok
 - UX：上传向导去掉未接线的「补充真实记忆 / 假预览」步骤（Decision 012）；记忆与 AI 只在编辑器填写

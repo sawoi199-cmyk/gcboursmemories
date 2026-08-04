@@ -152,4 +152,15 @@ Reason: 私密站不宜公开 CDN 长缓存；短服务端 Data Cache + 按需�
 Consequences:
 - 发布后前台最多延迟至下次失效（立即 revalidate）；缓存内 signed URL 仍在 1h TTL 内。
 - 时间线 payload 仅含封面图，详情仍按 slug 加载全部照片。
+
+## Decision 014
+
+Date: 2026-08-04
+Status: Accepted
+Context: 回忆增多后时间线一次加载全部会变卡；需要限制单次渲染量，并支持按日查找（类似 Instagram 日历）。
+Decision: 时间线改为最新在前、每页 20 条游标分页（「加载更多」）；分类与日期筛选走服务端 `/api/timeline`；日历索引 `/api/timeline/calendar` 标出有回忆的日期，点选按 `event_date` 过滤。
+Reason: 符合 SPEC「时间线懒加载」；日历跳转比纯滚动更适合多年档案；游标比 offset 更稳。
+Consequences:
+- 首屏与加载更多只签当页封面；全量列表缓存不再作为时间线主路径。
+- 分类筛选改为服务端 chapter / hasPlace，与分页一致。
 - 2026-08-04 补丁：`revalidatePublishedArchive` 同时 `revalidatePath` Studio 列表；`/studio` 与 `/studio/drafts` 设 `force-dynamic`，避免后台仍显示发布前的旧列表。

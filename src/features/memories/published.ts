@@ -346,30 +346,43 @@ export async function getHomeStats(): Promise<HomeStats> {
   )();
 }
 
-/** Timeline list: cover photo only + batch signed URLs. */
-async function fetchPublishedMemoriesForOwner(
-  ownerId: string,
+/** Newest-first page size for timeline “加载更多”. */
+export const TIMELINE_PAGE_SIZE = 20;
+
+export type TimelineCursor = {
+  eventDate: string;
+  id: string;
+};
+
+export type TimelineFilters = {
+  chapter?: ChapterId;
+  hasPlace?: boolean;
+  /** YYYY-MM-DD — Instagram-style day filter */
+  eventDate?: string;
+};
+
+export type TimelinePageResult = {
+  memories: PublishedMemory[];
+  nextCursor: TimelineCursor | null;
+};
+
+export type CalendarDayCount = {
+  date: string;
+  count: number;
+};
+
+/** PostgREST filter: newer pages when ordered by event_date desc, id desc. */
+export function timelineCursorOrFilter(cursor: TimelineCursor): string {
+  return `event_date.lt.${cursor.eventDate},and(event_date.eq.${cursor.eventDate},id.lt.${cursor.id})`;
+}
+
+async function hydrateEventsWithCovers(
+  supabase: ServiceClient,
+  eventRows: EventRow[],
 ): Promise<PublishedMemory[]> {
-  const supabase = createServiceClient();
-  const { data: events, error } = await supabase
-    .from("memory_events")
-    .select(
-      "id, slug, title, subtitle, one_line, event_date, place_name, template_id, status, mood, chapter, published_at",
-    )
-    .eq("owner_id", ownerId)
-    .eq("status", "published")
-    .order("event_date", { ascending: true })
-    .order("published_at", { ascending: true });
+  if (eventRows.length === 0) return [];
 
-  if (error) throw new Error(error.message);
-  if (!events?.length) return [];
-
-  const eventRows = events.map((event) => ({
-    ...event,
-    diary_body: null,
-  })) as EventRow[];
   const eventIds = eventRows.map((event) => event.id);
-
   const { data: allLinks, error: linksError } = await supabase
     .from("event_photos")
     .select(
@@ -404,6 +417,149 @@ async function fetchPublishedMemoriesForOwner(
     const mapped = mapPhotoFromLink(cover, index, thumbnailUrl);
     return mapEventRow(event, mapped ? [mapped] : []);
   });
+}
+
+/** Timeline list: cover photo only + batch signed URLs. */
+async function fetchPublishedMemoriesForOwner(
+  ownerId: string,
+): Promise<PublishedMemory[]> {
+  const supabase = createServiceClient();
+  const { data: events, error } = await supabase
+    .from("memory_events")
+    .select(
+      "id, slug, title, subtitle, one_line, event_date, place_name, template_id, status, mood, chapter, published_at",
+    )
+    .eq("owner_id", ownerId)
+    .eq("status", "published")
+    .order("event_date", { ascending: true })
+    .order("published_at", { ascending: true });
+
+  if (error) throw new Error(error.message);
+  if (!events?.length) return [];
+
+  const eventRows = events.map((event) => ({
+    ...event,
+    diary_body: null,
+  })) as EventRow[];
+
+  return hydrateEventsWithCovers(supabase, eventRows);
+}
+
+async function fetchPublishedTimelinePageForOwner(
+  ownerId: string,
+  filters: TimelineFilters,
+  cursor: TimelineCursor | null,
+  limit: number,
+): Promise<TimelinePageResult> {
+  const supabase = createServiceClient();
+  let query = supabase
+    .from("memory_events")
+    .select(
+      "id, slug, title, subtitle, one_line, event_date, place_name, template_id, status, mood, chapter, published_at",
+    )
+    .eq("owner_id", ownerId)
+    .eq("status", "published");
+
+  if (filters.chapter) {
+    query = query.eq("chapter", filters.chapter);
+  }
+  if (filters.hasPlace) {
+    query = query.not("place_name", "is", null).neq("place_name", "");
+  }
+  if (filters.eventDate) {
+    query = query.eq("event_date", filters.eventDate);
+  }
+  if (cursor) {
+    query = query.or(timelineCursorOrFilter(cursor));
+  }
+
+  const { data: events, error } = await query
+    .order("event_date", { ascending: false })
+    .order("id", { ascending: false })
+    .limit(limit + 1);
+
+  if (error) throw new Error(error.message);
+
+  const rows = (events ?? []).map((event) => ({
+    ...event,
+    diary_body: null,
+  })) as EventRow[];
+
+  const hasMore = rows.length > limit;
+  const pageRows = hasMore ? rows.slice(0, limit) : rows;
+  const memories = await hydrateEventsWithCovers(supabase, pageRows);
+  const last = pageRows[pageRows.length - 1];
+  const nextCursor =
+    hasMore && last
+      ? { eventDate: last.event_date, id: last.id }
+      : null;
+
+  return { memories, nextCursor };
+}
+
+export async function getPublishedTimelinePage(input: {
+  filters?: TimelineFilters;
+  cursor?: TimelineCursor | null;
+  limit?: number;
+} = {}): Promise<TimelinePageResult> {
+  if (!isSupabaseConfigured()) {
+    return { memories: [], nextCursor: null };
+  }
+
+  const ownerId = tryGetSiteOwnerId();
+  if (!ownerId) {
+    return { memories: [], nextCursor: null };
+  }
+
+  const filters = input.filters ?? {};
+  const cursor = input.cursor ?? null;
+  const limit = Math.min(
+    Math.max(input.limit ?? TIMELINE_PAGE_SIZE, 1),
+    50,
+  );
+
+  // Paginated pages are not Data-Cached (cursor cardinality); covers stay cheap via batch sign.
+  return fetchPublishedTimelinePageForOwner(ownerId, filters, cursor, limit);
+}
+
+async function fetchPublishedCalendarDaysForOwner(
+  ownerId: string,
+): Promise<CalendarDayCount[]> {
+  const supabase = createServiceClient();
+  const { data, error } = await supabase
+    .from("memory_events")
+    .select("event_date")
+    .eq("owner_id", ownerId)
+    .eq("status", "published");
+
+  if (error) throw new Error(error.message);
+
+  const counts = new Map<string, number>();
+  for (const row of data ?? []) {
+    const date = row.event_date;
+    if (!date) continue;
+    counts.set(date, (counts.get(date) ?? 0) + 1);
+  }
+
+  return [...counts.entries()]
+    .map(([date, count]) => ({ date, count }))
+    .sort((a, b) => b.date.localeCompare(a.date));
+}
+
+export async function getPublishedCalendarDays(): Promise<CalendarDayCount[]> {
+  if (!isSupabaseConfigured()) return [];
+
+  const ownerId = tryGetSiteOwnerId();
+  if (!ownerId) return [];
+
+  return unstable_cache(
+    () => fetchPublishedCalendarDaysForOwner(ownerId),
+    ["published-calendar-days", ownerId],
+    {
+      revalidate: PUBLISHED_CACHE_REVALIDATE_SECONDS,
+      tags: [PUBLISHED_CACHE_TAG],
+    },
+  )();
 }
 
 export async function getPublishedMemories(): Promise<PublishedMemory[]> {

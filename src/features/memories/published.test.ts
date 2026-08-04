@@ -3,6 +3,7 @@ import {
   daysTogetherFromStartDate,
   neighborsFromOrderedList,
   pickCoverLink,
+  timelineCursorOrFilter,
 } from "@/features/memories/published";
 
 describe("daysTogetherFromStartDate", () => {
@@ -82,5 +83,18 @@ describe("pickCoverLink", () => {
 
   it("returns null for empty list", () => {
     expect(pickCoverLink([])).toBeNull();
+  });
+});
+
+describe("timelineCursorOrFilter", () => {
+  it("builds a descending composite cursor filter", () => {
+    expect(
+      timelineCursorOrFilter({
+        eventDate: "2025-06-08",
+        id: "00000000-0000-4000-8000-000000000002",
+      }),
+    ).toBe(
+      "event_date.lt.2025-06-08,and(event_date.eq.2025-06-08,id.lt.00000000-0000-4000-8000-000000000002)",
+    );
   });
 });
