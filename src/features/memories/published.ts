@@ -219,16 +219,29 @@ export async function getHomeStats(): Promise<HomeStats> {
     return emptyHomeStats();
   }
   const supabase = createServiceClient();
-  const { data: settings } = await supabase
+  let { data: settings } = await supabase
     .from("relationship_settings")
-    .select("relationship_start_date")
+    .select("owner_id, relationship_start_date")
     .eq("owner_id", ownerId)
     .maybeSingle();
+
+  // Single-archive fallback: if SITE_OWNER_ID does not match the seeded row, still show stats.
+  if (!settings) {
+    const { data: fallback } = await supabase
+      .from("relationship_settings")
+      .select("owner_id, relationship_start_date")
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    settings = fallback;
+  }
+
+  const statsOwnerId = settings?.owner_id ?? ownerId;
 
   const { data: events } = await supabase
     .from("memory_events")
     .select("id, place_name")
-    .eq("owner_id", ownerId)
+    .eq("owner_id", statsOwnerId)
     .eq("status", "published");
 
   const ids = (events ?? []).map((event) => event.id);

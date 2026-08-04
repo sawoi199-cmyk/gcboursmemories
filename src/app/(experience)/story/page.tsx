@@ -3,6 +3,8 @@ import { FadeIn } from "@/components/motion/fade-in";
 import { EmptyState } from "@/components/ui/status-blocks";
 import { getStoryChapters } from "@/features/memories/published";
 
+export const dynamic = "force-dynamic";
+
 export default async function StoryPage() {
   const chapters = await getStoryChapters();
 

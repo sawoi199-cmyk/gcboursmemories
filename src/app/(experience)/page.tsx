@@ -4,6 +4,9 @@ import { buttonVariants } from "@/components/ui/button";
 import { getHomeStats } from "@/features/memories/published";
 import { cn } from "@/lib/utils";
 
+/** Always read live stats (days together, counts) — do not bake "—" at build time. */
+export const dynamic = "force-dynamic";
+
 export default async function HomePage() {
   const stats = await getHomeStats();
 
