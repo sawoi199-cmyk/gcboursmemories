@@ -42,7 +42,7 @@ async function hasValidSiteSession(request: NextRequest): Promise<boolean> {
   return verified.ok;
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
   if (pathname.startsWith("/auth/login")) {

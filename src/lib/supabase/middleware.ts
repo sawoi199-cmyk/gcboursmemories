@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 /**
  * Refreshes Supabase Auth cookies when present. Site access is gated by
- * ours_partner_session in src/middleware.ts — not Supabase user session.
+ * ours_partner_session in src/proxy.ts — not Supabase user session.
  */
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
