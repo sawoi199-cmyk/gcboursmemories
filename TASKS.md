@@ -30,6 +30,6 @@ Phase 8 — 测试与部署（已落地骨架；生产部署需你在 Vercel/Sup
 
 - 仓库：https://github.com/asushi199/gcbours
 - 背景音乐仍延后
-- Bugfix：Studio 编辑器「故事章节」下拉曾写死 `DEFAULT_CHAPTER_LABELS`，设置页自定义名称不生效；现从 `site_settings.chapter_labels` 经 `getEditorMemory` 注入 `chapterLabels`
+- Bugfix：Studio 编辑器「故事章节」下拉曾写死默认文案，且误读 `site_settings`；现从 `relationship_settings.chapter_labels` 经 `getEditorMemory` 注入 `chapterLabels`
 - 访问模型：体验与 Studio 共用站点密码 Cookie；`chapter-labels` 插入默认称呼已对齐 臭宝/乖宝
 - Final review：middleware 校验 DB `password_version`；`requireSiteSession` DB error→503；published/signed-original owner 作用域；logout 检查 response.ok

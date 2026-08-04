@@ -29,7 +29,7 @@ export type EditorMemoryPayload = {
     source: string;
     created_at: string;
   }>;
-  /** Resolved display labels (defaults + site_settings.chapter_labels). */
+  /** Resolved display labels (defaults + relationship_settings.chapter_labels). */
   chapterLabels: Record<ChapterId, string>;
 };
 
@@ -126,7 +126,7 @@ export async function getEditorMemory(
     .limit(20);
 
   const { data: settings } = await supabase
-    .from("site_settings")
+    .from("relationship_settings")
     .select("chapter_labels")
     .eq("owner_id", ownerId)
     .maybeSingle();
