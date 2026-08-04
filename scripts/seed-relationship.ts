@@ -74,8 +74,8 @@ async function main() {
     const { error: letterError } = await supabase.from("letters").insert({
       owner_id: ownerId,
       title: "写给你的一封信",
-      body: "这个档案没有最后一页。\n\n生日快乐。\n谢谢你出现在我的生活里。",
-      letter_date: new Date().toISOString().slice(0, 10),
+      body: "这个档案没有最后一页。\n\n因为往后的每一次出门、\n每一顿饭、每一次旅行，\n都会成为我们一起写下的新章节。\n\n那些平凡却闪闪发亮的点点滴滴，\n我都会好好收藏在这里。\n\n我们会继续一起生活，\n一起创造新的回忆，\n把属于我们的故事，\n慢慢写成一本没有结局的书。\n\n生日快乐。\n谢谢你来到我的生命里，\n也谢谢你愿意陪我一起，把未来写下去。",
+      letter_date: "2026-09-14",
       status: "draft",
     });
     if (letterError) {

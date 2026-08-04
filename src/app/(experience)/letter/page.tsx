@@ -49,7 +49,7 @@ export default function LetterPage() {
               </p>
             ))}
           </div>
-          <p className="relative mt-12 font-serif text-base text-ink/70">— 你的档案管理员</p>
+          <p className="relative mt-12 font-serif text-base text-ink/70">——你的档案管理员</p>
         </div>
       </FadeIn>
 
