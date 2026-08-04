@@ -14,6 +14,7 @@ import { isSupabaseConfigured } from "@/lib/supabase/env";
 const DEFAULT_OWNER_NAME = "臭宝";
 const DEFAULT_PARTNER_NAME = "乖宝";
 
+// Best-effort in-memory rate limit: per-instance only on serverless (no shared Redis).
 const attempts = new Map<string, { count: number; resetAt: number }>();
 const WINDOW_MS = 60_000;
 const MAX_ATTEMPTS = 12;

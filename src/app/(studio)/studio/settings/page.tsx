@@ -1,7 +1,7 @@
-import Link from "next/link";
 import { FadeIn } from "@/components/motion/fade-in";
 import { ChapterLabelsForm } from "@/components/studio/chapter-labels-form";
 import { NamesForm } from "@/components/studio/names-form";
+import { StudioLogoutButton } from "@/components/studio/studio-logout-button";
 import { UnlockPasswordForm } from "@/components/studio/unlock-password-form";
 import { buttonVariants } from "@/components/ui/button";
 import { resolveChapterLabels, type ChapterId } from "@/config/chapters";
@@ -95,9 +95,6 @@ export default async function StudioSettingsPage() {
               先配置 GAS_WEB_APP_URL / GAS_SHARED_SECRET
             </button>
           )}
-          <Link href="/auth/login" className={cn(buttonVariants({ variant: "outline" }))}>
-            管理员登录页
-          </Link>
         </div>
 
         <p className="mt-4 text-xs leading-6 text-muted-ours">
@@ -107,11 +104,9 @@ export default async function StudioSettingsPage() {
         </p>
       </div>
 
-      <form action="/auth/logout" method="post" className="mt-8">
-        <button type="submit" className={cn(buttonVariants({ variant: "outline" }))}>
-          退出登录
-        </button>
-      </form>
+      <div className="mt-8">
+        <StudioLogoutButton />
+      </div>
     </section>
   );
 }

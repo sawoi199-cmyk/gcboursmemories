@@ -81,8 +81,8 @@ export async function POST(request: Request) {
       const { error } = await supabase.from("relationship_settings").insert({
         owner_id: session.ownerId,
         relationship_title: "OURS",
-        partner_name: "她",
-        owner_name: "我",
+        partner_name: "乖宝",
+        owner_name: "臭宝",
         chapter_labels: labels,
       });
       if (error) {

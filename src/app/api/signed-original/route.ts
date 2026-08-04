@@ -49,6 +49,7 @@ export async function GET(request: Request) {
         .from("memory_events")
         .select("id")
         .in("id", eventIds)
+        .eq("owner_id", session.ownerId)
         .eq("status", "published")
         .limit(1);
 

@@ -125,6 +125,7 @@ describe("requireSiteSession", () => {
           eq: vi.fn().mockReturnValue({
             maybeSingle: vi.fn().mockResolvedValue({
               data: { password_version: 2 },
+              error: null,
             }),
           }),
         }),
@@ -132,6 +133,27 @@ describe("requireSiteSession", () => {
     } as unknown as ReturnType<typeof createServiceClient>);
     const result = await requireSiteSession();
     expect(result).toEqual({ ok: false, status: 401, message: "Unauthorized" });
+  });
+
+  it("returns 503 when settings select returns an error", async () => {
+    mockCreateServiceClient.mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            maybeSingle: vi.fn().mockResolvedValue({
+              data: null,
+              error: { message: "connection failed" },
+            }),
+          }),
+        }),
+      }),
+    } as unknown as ReturnType<typeof createServiceClient>);
+    const result = await requireSiteSession();
+    expect(result).toEqual({
+      ok: false,
+      status: 503,
+      message: "Unable to verify session",
+    });
   });
 
   it("returns ownerId and pwdVersion on success", async () => {

@@ -41,11 +41,15 @@ export async function requireSiteSession(): Promise<
   }
 
   const admin = createServiceClient();
-  const { data } = await admin
+  const { data, error } = await admin
     .from("relationship_settings")
     .select("password_version")
     .eq("owner_id", ownerId)
     .maybeSingle();
+
+  if (error) {
+    return { ok: false, status: 503, message: "Unable to verify session" };
+  }
 
   const currentVersion = data?.password_version ?? 0;
   if (!assertSessionMatchesVersion(verified.pwdVersion, currentVersion)) {
