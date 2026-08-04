@@ -1,4 +1,8 @@
 import { NextResponse } from "next/server";
+import {
+  DeleteMemoryBodySchema,
+  deleteMemoryEvent,
+} from "@/features/memories/delete-memory";
 import { getEditorMemory } from "@/features/memories/get-editor-memory";
 import { SaveMemorySchema, saveMemoryEvent } from "@/features/memories/save-memory";
 import { requireSiteSession } from "@/lib/security/require-site-session";
@@ -64,5 +68,51 @@ export async function PATCH(request: Request, context: RouteContext) {
       { ok: false, message: error instanceof Error ? error.message : "Save failed" },
       { status: 500 },
     );
+  }
+}
+
+export async function DELETE(request: Request, context: RouteContext) {
+  try {
+    if (!isSupabaseConfigured()) {
+      return NextResponse.json({ ok: false, message: "Supabase not configured" }, { status: 503 });
+    }
+
+    const { id } = await context.params;
+    const session = await requireSiteSession();
+    if (!session.ok) {
+      return NextResponse.json({ ok: false, message: session.message }, { status: session.status });
+    }
+
+    let body: unknown = {};
+    const text = await request.text();
+    if (text.trim()) {
+      try {
+        body = JSON.parse(text) as unknown;
+      } catch {
+        return NextResponse.json({ ok: false, message: "Invalid JSON" }, { status: 400 });
+      }
+    }
+
+    const parsed = DeleteMemoryBodySchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ ok: false, message: "Invalid payload" }, { status: 400 });
+    }
+
+    const result = await deleteMemoryEvent({
+      ownerId: session.ownerId,
+      memoryId: id,
+      confirmTitle: parsed.data.confirmTitle,
+    });
+
+    return NextResponse.json(result);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Delete failed";
+    const status =
+      message === "Not found"
+        ? 404
+        : message.includes("confirmTitle")
+          ? 400
+          : 500;
+    return NextResponse.json({ ok: false, message }, { status });
   }
 }

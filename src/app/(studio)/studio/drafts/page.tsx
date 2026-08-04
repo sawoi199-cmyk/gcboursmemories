@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { FadeIn } from "@/components/motion/fade-in";
+import { DeleteMemoryButton } from "@/components/studio/delete-memory-button";
 import { getSiteOwnerId } from "@/lib/config/site-owner";
 import { createServiceClient } from "@/lib/supabase/admin";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
@@ -100,22 +101,26 @@ export default async function StudioDraftsPage() {
 
 function MemoryLink({ memory }: { memory: MemoryRow }) {
   return (
-    <li>
-      <Link
-        href={`/studio/memories/${memory.id}/edit`}
-        className="block rounded-2xl border border-line bg-paper px-4 py-4 hover:border-ink/20"
-      >
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <p className="font-serif text-xl text-ink">{memory.title}</p>
-          <span className="text-[11px] tracking-wide text-muted-ours">
-            {memory.status === "published" ? "已发布 · 点此编辑" : "草稿 · 点此编辑"}
-          </span>
-        </div>
-        <p className="mt-1 text-xs text-muted-ours">
-          {memory.eventDate} · {memory.meta}
-          {memory.status === "published" ? ` · /memory/${memory.slug}` : ""}
-        </p>
-      </Link>
+    <li className="rounded-2xl border border-line bg-paper px-4 py-4 hover:border-ink/20">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <Link href={`/studio/memories/${memory.id}/edit`} className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <p className="font-serif text-xl text-ink">{memory.title}</p>
+            <span className="text-[11px] tracking-wide text-muted-ours">
+              {memory.status === "published" ? "已发布 · 点此编辑" : "草稿 · 点此编辑"}
+            </span>
+          </div>
+          <p className="mt-1 text-xs text-muted-ours">
+            {memory.eventDate} · {memory.meta}
+            {memory.status === "published" ? ` · /memory/${memory.slug}` : ""}
+          </p>
+        </Link>
+        <DeleteMemoryButton
+          memoryId={memory.id}
+          title={memory.title}
+          status={memory.status}
+        />
+      </div>
     </li>
   );
 }

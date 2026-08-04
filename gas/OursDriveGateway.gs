@@ -154,6 +154,26 @@ function doPost(e) {
       });
     }
 
+    if (action === "deleteFile") {
+      if (!body.fileId) {
+        throw new Error("fileId is required.");
+      }
+      try {
+        DriveApp.getFileById(body.fileId).setTrashed(true);
+      } catch (err) {
+        var msg = String(err && err.message ? err.message : err);
+        // Already gone / not found → success for idempotent cleanup
+        if (msg.indexOf("not found") === -1 && msg.indexOf("No item") === -1) {
+          throw err;
+        }
+      }
+      return json_({
+        ok: true,
+        action: "deleteFile",
+        fileId: body.fileId,
+      });
+    }
+
     throw new Error("Unknown action: " + action);
   } catch (err) {
     return json_({

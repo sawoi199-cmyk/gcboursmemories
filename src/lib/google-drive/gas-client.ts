@@ -115,6 +115,11 @@ export async function fetchDriveFile(fileId: string) {
   return callGas("getFile", { fileId });
 }
 
+/** Move a Drive file to trash via GAS (idempotent if already gone). */
+export async function deleteDriveFile(fileId: string) {
+  return callGas("deleteFile", { fileId });
+}
+
 export async function getDriveConfigStatus(): Promise<DriveConnectionStatus> {
   const gasUrlConfigured = Boolean(process.env.GAS_WEB_APP_URL);
   const sharedSecretConfigured = Boolean(process.env.GAS_SHARED_SECRET);

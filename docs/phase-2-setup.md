@@ -26,6 +26,7 @@ npm run seed
    - 具有访问权限的用户：任何人（鉴权靠共享密钥，**不要**省略密钥校验）
 6. 把 Web App URL 写入 `.env.local` 的 `GAS_WEB_APP_URL`。
 7. 重启 `npm run dev`，打开 Studio → 设置，应显示「GAS 网关可达」。
+8. 网关 action：`ping` / `ensureFolders` / `upload` / `getFile` / `deleteFile`（进回收站）。仓库更新 GAS 脚本后须**重新部署** Web App，否则删除回忆/照片无法清 Drive。
 
 不要把 Drive 文件设成「知道链接的任何人可查看」。网站读原图仍走服务端 `/api/signed-image`（Phase 6）经 GAS `getFile` 拉取。
 

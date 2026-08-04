@@ -70,6 +70,11 @@ export function UploadWizard() {
     [items],
   );
 
+  const failedCount = useMemo(
+    () => items.filter((item) => item.status === "error").length,
+    [items],
+  );
+
   const addFiles = useCallback((fileList: FileList | File[]) => {
     const next = Array.from(fileList).map((file) => ({
       localId: crypto.randomUUID(),
@@ -80,6 +85,43 @@ export function UploadWizard() {
     }));
     setItems((current) => [...current, ...next]);
   }, []);
+
+  async function removeItem(localId: string) {
+    const target = items.find((row) => row.localId === localId);
+    if (!target) return;
+
+    if (target.status === "done" && target.photoId) {
+      setBusy(true);
+      try {
+        const response = await fetch(`/api/photos/${target.photoId}`, {
+          method: "DELETE",
+        });
+        const json = (await response.json()) as { ok?: boolean; message?: string };
+        if (!response.ok || !json.ok) {
+          throw new Error(json.message ?? "Remove failed");
+        }
+      } catch (err) {
+        setGroupingError(err instanceof Error ? err.message : "Remove failed");
+        setBusy(false);
+        return;
+      }
+      setBusy(false);
+    }
+
+    URL.revokeObjectURL(target.previewUrl);
+    setItems((current) => current.filter((row) => row.localId !== localId));
+  }
+
+  function clearFailed() {
+    setItems((current) => {
+      for (const row of current) {
+        if (row.status === "error") {
+          URL.revokeObjectURL(row.previewUrl);
+        }
+      }
+      return current.filter((row) => row.status !== "error");
+    });
+  }
 
   async function uploadQueued() {
     setBusy(true);
@@ -313,13 +355,10 @@ export function UploadWizard() {
                   <button
                     type="button"
                     className="text-xs text-muted-ours underline"
-                    onClick={() =>
-                      setItems((current) =>
-                        current.filter((row) => row.localId !== item.localId),
-                      )
-                    }
+                    disabled={busy || item.status === "uploading"}
+                    onClick={() => void removeItem(item.localId)}
                   >
-                    取消
+                    {item.status === "error" ? "移除" : "取消"}
                   </button>
                 </li>
               ))}
@@ -333,6 +372,14 @@ export function UploadWizard() {
                 className={cn(buttonVariants())}
               >
                 {busy ? "上传中…" : "开始上传"}
+              </button>
+              <button
+                type="button"
+                disabled={busy || failedCount === 0}
+                onClick={clearFailed}
+                className={cn(buttonVariants({ variant: "outline" }))}
+              >
+                清除全部失败{failedCount > 0 ? `（${failedCount}）` : ""}
               </button>
               <button
                 type="button"

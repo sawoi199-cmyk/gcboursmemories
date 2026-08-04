@@ -164,3 +164,15 @@ Consequences:
 - 首屏与加载更多只签当页封面；全量列表缓存不再作为时间线主路径。
 - 分类筛选改为服务端 chapter / hasPlace，与分页一致。
 - 2026-08-04 补丁：`revalidatePublishedArchive` 同时 `revalidatePath` Studio 列表；`/studio` 与 `/studio/drafts` 设 `force-dynamic`，避免后台仍显示发布前的旧列表。
+
+## Decision 015
+
+Date: 2026-08-04
+Status: Accepted
+Context: Studio 无法删除草稿或拿掉错误照片；上传失败项只能本地取消；零引用原图会堆积在 Drive / 缩略图桶。
+Decision: 统一硬清理——删回忆或从事件移除照片后，对不再被任何 `event_photos` 引用的 `photos` 删除 DB 行、Supabase `memory-thumbnails` 与 GAS `deleteFile`（Drive `setTrashed`）。草稿确认即可删；已发布须输入完整标题。编辑器移除后事件至少保留 1 张。上传向导可清除失败项；已成功上传未入组的取消走孤儿删除 API。
+Reason: 符合 SPEC「删除草稿」与「删除操作有确认」；硬清理避免免费额度与 Drive 垃圾；最少一张防止空事件半残。
+Consequences:
+- 须重新部署含 `deleteFile` 的 GAS Web App，否则硬清理会留下 Drive 文件并记 warnings。
+- 删除不可应用内撤销；Drive 文件在 Google 回收站可短时找回。
+- `DELETE /api/memories/[id]`、`POST .../photos/remove`、`DELETE /api/photos/[id]`。

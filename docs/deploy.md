@@ -37,6 +37,10 @@ Follow [`docs/phase-2-setup.md`](./phase-2-setup.md). Production must use:
 
 Never make Drive folders “anyone with the link”.
 
+After pulling code that adds photo/memory delete, **redeploy** the Apps Script Web App so `deleteFile` is live. Without redeploy, Studio can still delete DB rows but Drive originals may remain (API returns `warnings`).
+
+Gateway actions: `ping` / `ensureFolders` / `upload` / `getFile` / `deleteFile` (trash).
+
 ## 3. Shared site password (access model)
 
 The experience **and** Studio share one site password. After unlock, a 30-day HMAC cookie (`ours_partner_session`, role `site`) gates all routes.

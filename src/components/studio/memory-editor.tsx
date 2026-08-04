@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { PhotoPlaceholder } from "@/components/experience/photo-placeholder";
 import { FadeIn } from "@/components/motion/fade-in";
+import { DeleteMemoryButton } from "@/components/studio/delete-memory-button";
 import { buttonVariants } from "@/components/ui/button";
 import { CHAPTER_IDS, type ChapterId } from "@/config/chapters";
 import type { EditorMemoryPayload, EditorPhoto } from "@/features/memories/get-editor-memory";
@@ -21,6 +22,7 @@ type MobileTab = "content" | "photos" | "design" | "preview";
 export function MemoryEditor({ initial }: MemoryEditorProps) {
   const router = useRouter();
   const [title, setTitle] = useState(initial.memory.title);
+  const [savedTitle, setSavedTitle] = useState(initial.memory.title);
   const [oneLine, setOneLine] = useState(initial.memory.oneLine);
   const [diaryBody, setDiaryBody] = useState(initial.memory.diaryBody);
   const [userNote, setUserNote] = useState(initial.memory.userNote);
@@ -48,6 +50,7 @@ export function MemoryEditor({ initial }: MemoryEditorProps) {
   const [slug, setSlug] = useState(initial.memory.slug);
   const [publishOpen, setPublishOpen] = useState(false);
   const [publishBusy, setPublishBusy] = useState(false);
+  const [removeBusyId, setRemoveBusyId] = useState<string | null>(null);
 
   const memory = useMemo(
     () => ({
@@ -92,6 +95,7 @@ export function MemoryEditor({ initial }: MemoryEditorProps) {
       setSavedAt(
         `${message} · ${new Date(json.savedAt ?? Date.now()).toLocaleTimeString("zh-CN")}`,
       );
+      setSavedTitle(title);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Save failed");
       if (options?.throwOnError) throw err;
@@ -307,6 +311,42 @@ export function MemoryEditor({ initial }: MemoryEditorProps) {
     }
   }
 
+  async function removePhoto(photoId: string) {
+    if (photos.length <= 1) return;
+    setRemoveBusyId(photoId);
+    setError(null);
+    try {
+      const response = await fetch(`/api/memories/${initial.memory.id}/photos/remove`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ photoIds: [photoId] }),
+      });
+      const json = (await response.json()) as {
+        ok?: boolean;
+        message?: string;
+        remainingPhotoIds?: string[];
+      };
+      if (!response.ok || !json.ok || !json.remainingPhotoIds) {
+        throw new Error(json.message ?? "Remove failed");
+      }
+      const remaining = new Set(json.remainingPhotoIds);
+      setPhotos((current) => {
+        const next = current.filter((photo) => remaining.has(photo.photoId));
+        if (next.length === 0) return next;
+        return next.map((photo, index) => ({
+          ...photo,
+          role: index === 0 ? "cover" : photo.role === "cover" ? "detail" : photo.role,
+        }));
+      });
+      setSelectedForSplit((current) => current.filter((id) => id !== photoId));
+      setSavedAt(`已移除照片 · ${new Date().toLocaleTimeString("zh-CN")}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Remove failed");
+    } finally {
+      setRemoveBusyId(null);
+    }
+  }
+
   return (
     <section className="mx-auto w-full max-w-6xl px-4 py-8 md:px-6 md:py-12">
       <FadeIn className="flex flex-wrap items-end justify-between gap-3">
@@ -358,6 +398,12 @@ export function MemoryEditor({ initial }: MemoryEditorProps) {
               发布
             </button>
           )}
+          <DeleteMemoryButton
+            memoryId={initial.memory.id}
+            title={status === "published" ? savedTitle : title}
+            status={status}
+            onDeleted={() => router.push("/studio/drafts")}
+          />
         </div>
       </FadeIn>
 
@@ -477,6 +523,15 @@ export function MemoryEditor({ initial }: MemoryEditorProps) {
                     onClick={() => setCover(index)}
                   >
                     设封面
+                  </button>
+                  <button
+                    type="button"
+                    disabled={photos.length <= 1 || removeBusyId === photo.photoId}
+                    title={photos.length <= 1 ? "至少保留一张；要删整条请用删除回忆" : "移除照片"}
+                    className="rounded border border-line px-2 py-0.5 text-[10px] text-accent-ours disabled:opacity-40"
+                    onClick={() => void removePhoto(photo.photoId)}
+                  >
+                    {removeBusyId === photo.photoId ? "移除中…" : "移除"}
                   </button>
                   <label className="ml-auto flex items-center gap-1 text-[10px] text-muted-ours">
                     <input
