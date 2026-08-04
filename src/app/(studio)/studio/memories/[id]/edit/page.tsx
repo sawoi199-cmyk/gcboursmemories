@@ -1,9 +1,9 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
 import { MemoryEditor } from "@/components/studio/memory-editor";
+import { resolveChapterLabels } from "@/config/chapters";
 import { getEditorMemory } from "@/features/memories/get-editor-memory";
+import { getSiteOwnerId } from "@/lib/config/site-owner";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
-import { createClient } from "@/lib/supabase/server";
 import { getMemoryById } from "@/config/mock-data";
 
 type PageProps = {
@@ -35,21 +35,14 @@ export default async function StudioMemoryEditPage({ params }: PageProps) {
           })),
           siblingDrafts: [],
           diaryVersions: [],
+          chapterLabels: resolveChapterLabels(null),
         }}
       />
     );
   }
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    notFound();
-  }
-
-  const payload = await getEditorMemory(user.id, id);
+  const ownerId = getSiteOwnerId();
+  const payload = await getEditorMemory(ownerId, id);
   if (!payload) {
     return (
       <section className="mx-auto max-w-2xl px-6 py-16">

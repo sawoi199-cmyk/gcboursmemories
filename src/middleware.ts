@@ -1,9 +1,12 @@
-import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { getSiteOwnerId } from "@/lib/config/site-owner";
 import {
   PARTNER_COOKIE_NAME,
+  partnerCookieOptions,
   verifyPartnerSessionToken,
 } from "@/lib/security/partner-session";
+import { createServiceClient } from "@/lib/supabase/admin";
+import { isSupabaseConfigured } from "@/lib/supabase/env";
 
 function isExperiencePath(pathname: string) {
   if (pathname === "/unlock") return false;
@@ -11,80 +14,92 @@ function isExperiencePath(pathname: string) {
   return prefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
 }
 
-export async function middleware(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({ request });
+function isStudioRoute(pathname: string) {
+  return pathname.startsWith("/studio");
+}
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  let userId: string | null = null;
-
-  if (url && anonKey) {
-    const supabase = createServerClient(url, anonKey, {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) => {
-            request.cookies.set(name, value);
-          });
-          supabaseResponse = NextResponse.next({ request });
-          cookiesToSet.forEach(({ name, value, options }) => {
-            supabaseResponse.cookies.set(name, value, options);
-          });
-        },
-      },
+function redirectToUnlock(request: NextRequest, clearCookie: boolean) {
+  const unlockUrl = request.nextUrl.clone();
+  unlockUrl.pathname = "/unlock";
+  unlockUrl.search = "";
+  const response = NextResponse.redirect(unlockUrl);
+  if (clearCookie) {
+    response.cookies.set(PARTNER_COOKIE_NAME, "", {
+      ...partnerCookieOptions(0),
+      maxAge: 0,
     });
+  }
+  return response;
+}
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    userId = user?.id ?? null;
+/**
+ * HMAC + expiry + DB password_version gate.
+ * Fail closed when SITE_OWNER_ID / Supabase / service role / DB query is unavailable.
+ */
+async function hasValidSiteSession(request: NextRequest): Promise<boolean> {
+  const token = request.cookies.get(PARTNER_COOKIE_NAME)?.value;
+  if (!token) {
+    return false;
   }
 
+  const verified = await verifyPartnerSessionToken(token);
+  if (!verified.ok) {
+    return false;
+  }
+
+  if (!isSupabaseConfigured()) {
+    return false;
+  }
+
+  let ownerId: string;
+  try {
+    ownerId = getSiteOwnerId();
+  } catch {
+    return false;
+  }
+
+  try {
+    const admin = createServiceClient();
+    const { data, error } = await admin
+      .from("relationship_settings")
+      .select("password_version")
+      .eq("owner_id", ownerId)
+      .maybeSingle();
+
+    if (error) {
+      return false;
+    }
+
+    const currentVersion = data?.password_version ?? 0;
+    return verified.pwdVersion === currentVersion;
+  } catch {
+    // Missing service role key or Edge client failure → fail closed
+    return false;
+  }
+}
+
+export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
-  const isStudioRoute = pathname.startsWith("/studio");
-  const isLogin = pathname.startsWith("/auth/login");
-  const isAuthRoute =
-    pathname.startsWith("/auth/login") || pathname.startsWith("/auth/callback");
 
-  if (isStudioRoute && !userId) {
-    const redirectUrl = request.nextUrl.clone();
-    redirectUrl.pathname = "/auth/login";
-    redirectUrl.searchParams.set("next", pathname);
-    return NextResponse.redirect(redirectUrl);
+  if (pathname.startsWith("/auth/login")) {
+    return redirectToUnlock(request, false);
   }
 
-  if (isLogin && userId) {
-    const redirectUrl = request.nextUrl.clone();
-    redirectUrl.pathname = "/studio";
-    redirectUrl.search = "";
-    return NextResponse.redirect(redirectUrl);
+  if (pathname === "/unlock" || pathname.startsWith("/auth/callback")) {
+    return NextResponse.next();
   }
 
-  if (isAuthRoute) {
-    return supabaseResponse;
-  }
+  const needsGate = isStudioRoute(pathname) || isExperiencePath(pathname);
 
-  if (isExperiencePath(pathname)) {
-    const partnerToken = request.cookies.get(PARTNER_COOKIE_NAME)?.value;
-    const partnerOk = partnerToken
-      ? (await verifyPartnerSessionToken(partnerToken)).ok
-      : false;
-    if (!partnerOk && !userId) {
-      const unlockUrl = request.nextUrl.clone();
-      unlockUrl.pathname = "/unlock";
-      unlockUrl.search = "";
-      const redirect = NextResponse.redirect(unlockUrl);
-      supabaseResponse.cookies.getAll().forEach((cookie) => {
-        redirect.cookies.set(cookie.name, cookie.value);
-      });
-      return redirect;
+  if (needsGate) {
+    const sessionOk = await hasValidSiteSession(request);
+    if (!sessionOk) {
+      const hadCookie = Boolean(request.cookies.get(PARTNER_COOKIE_NAME)?.value);
+      return redirectToUnlock(request, hadCookie);
     }
   }
 
-  return supabaseResponse;
+  return NextResponse.next();
 }
 
 export const config = {

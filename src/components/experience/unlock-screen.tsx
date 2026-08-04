@@ -10,7 +10,8 @@ export function UnlockScreen() {
   const router = useRouter();
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
-  const [partnerName, setPartnerName] = useState("她");
+  const [ownerName, setOwnerName] = useState("臭宝");
+  const [partnerName, setPartnerName] = useState("乖宝");
   const [status, setStatus] = useState<"idle" | "success" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
 
@@ -28,6 +29,7 @@ export function UnlockScreen() {
       const json = (await response.json()) as {
         ok?: boolean;
         message?: string;
+        ownerName?: string;
         partnerName?: string;
       };
       if (!response.ok || !json.ok) {
@@ -35,7 +37,8 @@ export function UnlockScreen() {
         setError(json.message ?? "解锁失败");
         return;
       }
-      setPartnerName(json.partnerName ?? "她");
+      setOwnerName(json.ownerName ?? "臭宝");
+      setPartnerName(json.partnerName ?? "乖宝");
       setStatus("success");
       window.setTimeout(() => {
         router.push("/");
@@ -64,7 +67,9 @@ export function UnlockScreen() {
       {status === "success" ? (
         <FadeIn className="relative z-10 space-y-4">
           <p className="text-xs tracking-[0.3em] text-gold uppercase">Identity confirmed</p>
-          <h1 className="font-serif text-3xl md:text-4xl">Welcome back, {partnerName}</h1>
+          <h1 className="font-serif text-3xl md:text-4xl">
+            欢迎回来，{partnerName}和{ownerName}
+          </h1>
         </FadeIn>
       ) : (
         <FadeIn className="relative z-10 w-full max-w-md">
@@ -104,7 +109,7 @@ export function UnlockScreen() {
                 {error}
               </p>
             ) : (
-              <p className="mt-3 text-xs text-paper/35">密码在 Studio → 设置 中配置</p>
+              <p className="mt-3 text-xs text-paper/35">密码在设置里可以更改</p>
             )}
             <button
               type="submit"

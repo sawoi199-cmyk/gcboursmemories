@@ -1,5 +1,7 @@
+import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
-import { verifyPassword } from "@/lib/security/password-hash";
+import { getSiteOwnerId } from "@/lib/config/site-owner";
+import { hashPassword, verifyPassword } from "@/lib/security/password-hash";
 import {
   PARTNER_COOKIE_NAME,
   createPartnerSessionToken,
@@ -9,9 +11,20 @@ import { UnlockPayloadSchema } from "@/lib/security/unlock-schema";
 import { createServiceClient } from "@/lib/supabase/admin";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 
+const DEFAULT_OWNER_NAME = "臭宝";
+const DEFAULT_PARTNER_NAME = "乖宝";
+
+// Best-effort in-memory rate limit: per-instance only on serverless (no shared Redis).
 const attempts = new Map<string, { count: number; resetAt: number }>();
 const WINDOW_MS = 60_000;
 const MAX_ATTEMPTS = 12;
+
+function timingSafeEqualString(a: string, b: string): boolean {
+  const ba = Buffer.from(a);
+  const bb = Buffer.from(b);
+  if (ba.length !== bb.length) return false;
+  return timingSafeEqual(ba, bb);
+}
 
 function clientKey(request: Request) {
   return (
@@ -48,6 +61,16 @@ export async function POST(request: Request) {
       );
     }
 
+    let ownerId: string;
+    try {
+      ownerId = getSiteOwnerId();
+    } catch {
+      return NextResponse.json(
+        { ok: false, message: "服务未配置完成。" },
+        { status: 503 },
+      );
+    }
+
     const json: unknown = await request.json();
     const parsed = UnlockPayloadSchema.safeParse(json);
     if (!parsed.success) {
@@ -57,32 +80,62 @@ export async function POST(request: Request) {
     const supabase = createServiceClient();
     const { data: settings, error } = await supabase
       .from("relationship_settings")
-      .select("access_hash, partner_name, unlock_title, unlock_hint")
-      .order("created_at", { ascending: true })
-      .limit(1)
+      .select("access_hash, password_version, owner_name, partner_name")
+      .eq("owner_id", ownerId)
       .maybeSingle();
 
     if (error) {
       return NextResponse.json({ ok: false, message: "暂时无法验证。" }, { status: 500 });
     }
 
+    let passwordVersion: number;
+    let ownerName: string;
+    let partnerName: string;
+
     if (!settings?.access_hash) {
-      return NextResponse.json(
-        { ok: false, message: "专属入口尚未设置，请先在 Studio 设置密码。" },
-        { status: 403 },
+      const bootstrap = process.env.SITE_BOOTSTRAP_PASSWORD;
+      if (!bootstrap || !timingSafeEqualString(parsed.data.code, bootstrap)) {
+        return NextResponse.json(
+          { ok: false, message: "密码不正确。" },
+          { status: 401 },
+        );
+      }
+
+      const accessHash = await hashPassword(parsed.data.code);
+      ownerName = settings?.owner_name ?? DEFAULT_OWNER_NAME;
+      partnerName = settings?.partner_name ?? DEFAULT_PARTNER_NAME;
+      passwordVersion = 0;
+
+      const { error: upsertError } = await supabase.from("relationship_settings").upsert(
+        {
+          owner_id: ownerId,
+          relationship_title: "OURS",
+          owner_name: ownerName,
+          partner_name: partnerName,
+          access_hash: accessHash,
+          password_version: passwordVersion,
+        },
+        { onConflict: "owner_id" },
       );
+
+      if (upsertError) {
+        return NextResponse.json({ ok: false, message: "暂时无法验证。" }, { status: 500 });
+      }
+    } else {
+      const valid = await verifyPassword(parsed.data.code, settings.access_hash);
+      if (!valid) {
+        return NextResponse.json({ ok: false, message: "密码不正确。" }, { status: 401 });
+      }
+      passwordVersion = settings.password_version ?? 0;
+      ownerName = settings.owner_name ?? DEFAULT_OWNER_NAME;
+      partnerName = settings.partner_name ?? DEFAULT_PARTNER_NAME;
     }
 
-    const valid = await verifyPassword(parsed.data.code, settings.access_hash);
-    if (!valid) {
-      return NextResponse.json({ ok: false, message: "密码不正确。" }, { status: 401 });
-    }
-
-    const token = await createPartnerSessionToken();
+    const token = await createPartnerSessionToken(passwordVersion);
     const response = NextResponse.json({
       ok: true,
-      partnerName: settings.partner_name,
-      unlockTitle: settings.unlock_title,
+      ownerName,
+      partnerName,
     });
     response.cookies.set(PARTNER_COOKIE_NAME, token, partnerCookieOptions());
     return response;

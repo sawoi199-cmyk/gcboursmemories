@@ -1,6 +1,10 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+/**
+ * Refreshes Supabase Auth cookies when present. Site access is gated by
+ * ours_partner_session in src/middleware.ts — not Supabase user session.
+ */
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
@@ -28,32 +32,7 @@ export async function updateSession(request: NextRequest) {
     },
   });
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  const pathname = request.nextUrl.pathname;
-  const isStudioRoute = pathname.startsWith("/studio");
-  const isAuthRoute =
-    pathname.startsWith("/auth/login") || pathname.startsWith("/auth/callback");
-
-  if (isStudioRoute && !user) {
-    const redirectUrl = request.nextUrl.clone();
-    redirectUrl.pathname = "/auth/login";
-    redirectUrl.searchParams.set("next", pathname);
-    return NextResponse.redirect(redirectUrl);
-  }
-
-  if (pathname === "/auth/login" && user) {
-    const redirectUrl = request.nextUrl.clone();
-    redirectUrl.pathname = "/studio";
-    redirectUrl.search = "";
-    return NextResponse.redirect(redirectUrl);
-  }
-
-  if (isAuthRoute) {
-    return supabaseResponse;
-  }
+  await supabase.auth.getUser();
 
   return supabaseResponse;
 }

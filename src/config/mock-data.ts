@@ -11,8 +11,8 @@ export const mockStats = {
 
 export const mockRelationship = {
   relationshipTitle: "OURS",
-  partnerName: "她",
-  ownerName: "我",
+  partnerName: "乖宝",
+  ownerName: "臭宝",
 } as const;
 
 export const mockChapters = [

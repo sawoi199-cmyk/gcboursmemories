@@ -4,6 +4,7 @@ import {
   type ChapterId,
   resolveChapterLabels,
 } from "@/config/chapters";
+import { tryGetSiteOwnerId } from "@/lib/config/site-owner";
 import { createServiceClient } from "@/lib/supabase/admin";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import type { EventPhoto, MemoryEvent } from "@/types/memory";
@@ -46,28 +47,36 @@ async function signThumbnail(path: string | null) {
   return data?.signedUrl ?? null;
 }
 
+function emptyHomeStats(): HomeStats {
+  return {
+    daysTogether: null,
+    memoryCount: 0,
+    placeCount: 0,
+    photoCount: 0,
+    relationshipStartDate: null,
+  };
+}
+
 export async function getHomeStats(): Promise<HomeStats> {
   if (!isSupabaseConfigured()) {
-    return {
-      daysTogether: null,
-      memoryCount: 0,
-      placeCount: 0,
-      photoCount: 0,
-      relationshipStartDate: null,
-    };
+    return emptyHomeStats();
   }
 
+  const ownerId = tryGetSiteOwnerId();
+  if (!ownerId) {
+    return emptyHomeStats();
+  }
   const supabase = createServiceClient();
   const { data: settings } = await supabase
     .from("relationship_settings")
     .select("relationship_start_date")
-    .order("created_at", { ascending: true })
-    .limit(1)
+    .eq("owner_id", ownerId)
     .maybeSingle();
 
   const { data: events } = await supabase
     .from("memory_events")
     .select("id, place_name")
+    .eq("owner_id", ownerId)
     .eq("status", "published");
 
   const ids = (events ?? []).map((event) => event.id);
@@ -107,12 +116,15 @@ export async function getHomeStats(): Promise<HomeStats> {
 export async function getPublishedMemories(): Promise<PublishedMemory[]> {
   if (!isSupabaseConfigured()) return [];
 
+  const ownerId = tryGetSiteOwnerId();
+  if (!ownerId) return [];
   const supabase = createServiceClient();
   const { data: events, error } = await supabase
     .from("memory_events")
     .select(
       "id, slug, title, subtitle, one_line, diary_body, event_date, place_name, template_id, status, mood, chapter, published_at",
     )
+    .eq("owner_id", ownerId)
     .eq("status", "published")
     .order("event_date", { ascending: true })
     .order("published_at", { ascending: true });
@@ -200,14 +212,17 @@ export async function getStoryChapters(): Promise<StoryChapter[]> {
   const memories = await getPublishedMemories();
   let customLabels: Partial<Record<ChapterId, string>> | null = null;
   if (isSupabaseConfigured()) {
-    const supabase = createServiceClient();
-    const { data: settings } = await supabase
-      .from("relationship_settings")
-      .select("chapter_labels")
-      .order("created_at", { ascending: true })
-      .limit(1)
-      .maybeSingle();
-    customLabels = (settings?.chapter_labels as Partial<Record<ChapterId, string>> | null) ?? null;
+    const ownerId = tryGetSiteOwnerId();
+    if (ownerId) {
+      const supabase = createServiceClient();
+      const { data: settings } = await supabase
+        .from("relationship_settings")
+        .select("chapter_labels")
+        .eq("owner_id", ownerId)
+        .maybeSingle();
+      customLabels =
+        (settings?.chapter_labels as Partial<Record<ChapterId, string>> | null) ?? null;
+    }
   }
   const labels = resolveChapterLabels(customLabels);
   const order = [...CHAPTER_IDS];

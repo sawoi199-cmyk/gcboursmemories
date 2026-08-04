@@ -17,9 +17,10 @@ This guide covers Vercel + Supabase + GAS for the private couple archive.
    - `supabase/migrations/20260804010000_memory_user_note.sql`
    - `supabase/migrations/20260804120000_access_hash.sql`
    - `supabase/migrations/20260804140000_chapter_labels.sql`
-3. Create the admin Auth user (email/password).
-4. Ensure Storage bucket `memory-thumbnails` exists and is **private** (created by init migration / policies).
-5. Copy:
+3. Create the admin Auth user (email/password) if you still need it for seeding or recovery — **daily access no longer requires Auth login**.
+4. Note the admin user's UUID; it becomes `SITE_OWNER_ID` (must match `relationship_settings.owner_id` for existing data).
+5. Ensure Storage bucket `memory-thumbnails` exists and is **private** (created by init migration / policies).
+6. Copy:
    - Project URL → `NEXT_PUBLIC_SUPABASE_URL`
    - `anon` key → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
    - `service_role` key → `SUPABASE_SERVICE_ROLE_KEY` (**server only**)
@@ -36,7 +37,25 @@ Follow [`docs/phase-2-setup.md`](./phase-2-setup.md). Production must use:
 
 Never make Drive folders “anyone with the link”.
 
-## 3. Vercel project
+## 3. Shared site password (access model)
+
+The experience **and** Studio share one site password. After unlock, a 30-day HMAC cookie (`ours_partner_session`, role `site`) gates all routes.
+
+**First visit / bootstrap**
+
+1. Set `SITE_BOOTSTRAP_PASSWORD` in Vercel (strong random; temporary).
+2. Set `SITE_OWNER_ID` to the archive owner UUID.
+3. Deploy. Visit `/unlock` and enter the bootstrap password once.
+4. The app writes `access_hash` to `relationship_settings` with default nicknames (臭宝 / 乖宝).
+5. **Remove `SITE_BOOTSTRAP_PASSWORD`** from Vercel after the first successful unlock — it only applies when `access_hash` is empty.
+
+**Ongoing**
+
+- Change the site password in Studio → Settings →「站点共用密码」. This bumps `password_version` and invalidates old cookies.
+- Edit nicknames in Settings; welcome copy shows「欢迎回来，{partner}和{owner}」.
+- `/auth/login` redirects to `/unlock`; Supabase Auth is not the daily entry path.
+
+## 4. Vercel project
 
 1. Import the GitHub repo into Vercel.
 2. Framework preset: Next.js.
@@ -47,10 +66,12 @@ Never make Drive folders “anyone with the link”.
 | `NEXT_PUBLIC_SUPABASE_URL` | Public |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Public |
 | `SUPABASE_SERVICE_ROLE_KEY` | Secret, server only |
+| `SITE_OWNER_ID` | Secret, UUID of archive owner |
+| `SITE_BOOTSTRAP_PASSWORD` | Secret, optional — first unlock only; delete after use |
 | `GAS_WEB_APP_URL` | Secret |
 | `GAS_SHARED_SECRET` | Secret |
 | `GAS_ROOT_FOLDER_ID` | Secret |
-| `SESSION_SIGNING_SECRET` | Secret, ≥16 chars, partner cookie HMAC |
+| `SESSION_SIGNING_SECRET` | Secret, ≥16 chars, site session cookie HMAC |
 | `NEXT_PUBLIC_APP_URL` | e.g. `https://your-domain.vercel.app` |
 | `AI_PROVIDER` | `mock` or `openai_compatible` |
 | `AI_API_KEY` / `AI_MODEL` / `AI_BASE_URL` | Only if using real AI |
@@ -58,20 +79,22 @@ Never make Drive folders “anyone with the link”.
 
 4. Deploy. Confirm:
    - `/unlock` loads
-   - `/studio` redirects to login
-   - After admin login + unlock password set, partner can unlock
-   - Publish a memory; partner sees it on `/timeline`
+   - `/` and `/studio` redirect to `/unlock` without a session cookie
+   - After unlock with bootstrap or stored password, welcome shows nicknames and both experience + Studio are reachable
+   - Publish a memory; unlocked visitor sees it on `/timeline`
    - Fullscreen original loads via `/api/signed-original`
 
-## 4. Post-deploy checklist
+## 5. Post-deploy checklist
 
-- [ ] Studio settings: unlock password set
+- [ ] `SITE_OWNER_ID` matches production `relationship_settings.owner_id`
+- [ ] Site password set (bootstrap or Studio settings)
+- [ ] `SITE_BOOTSTRAP_PASSWORD` removed from env after first unlock
 - [ ] At least one published memory visible after unlock
-- [ ] Draft memories not visible without Studio
+- [ ] Draft memories not visible without unlock session
 - [ ] Service role / GAS secret not present in browser Network payloads
 - [ ] Custom domain HTTPS only (if used)
 
-## 5. Local validation before each deploy
+## 6. Local validation before each deploy
 
 ```bash
 npm run validate

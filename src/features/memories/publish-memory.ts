@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/admin";
 import { slugifyTitle } from "@/lib/utils/slug";
 
 export const PublishMemorySchema = z.object({
@@ -21,7 +21,7 @@ export async function publishMemoryEvent(input: {
   memoryId: string;
   slug: string;
 }) {
-  const supabase = await createClient();
+  const supabase = createServiceClient();
   const slug = normalizePublishSlug(input.slug);
 
   const { data: event, error } = await supabase
@@ -72,7 +72,7 @@ export async function publishMemoryEvent(input: {
 }
 
 export async function unpublishMemoryEvent(input: { ownerId: string; memoryId: string }) {
-  const supabase = await createClient();
+  const supabase = createServiceClient();
 
   const { error } = await supabase
     .from("memory_events")

@@ -51,8 +51,8 @@ async function main() {
     {
       owner_id: ownerId,
       relationship_title: "OURS",
-      partner_name: "她",
-      owner_name: "我",
+      partner_name: "乖宝",
+      owner_name: "臭宝",
       relationship_start_date: "2023-01-01",
       unlock_title: "PERSONAL MEMORY ARCHIVE",
       unlock_hint: "Enter the date only we remember.",

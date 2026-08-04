@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { FadeIn } from "@/components/motion/fade-in";
+import { getSiteOwnerId } from "@/lib/config/site-owner";
+import { createServiceClient } from "@/lib/supabase/admin";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
-import { createClient } from "@/lib/supabase/server";
 
 type MemoryRow = {
   id: string;
@@ -16,16 +17,13 @@ export default async function StudioDraftsPage() {
   let memories: MemoryRow[] = [];
 
   if (isSupabaseConfigured()) {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (user) {
+    try {
+      const ownerId = getSiteOwnerId();
+      const supabase = createServiceClient();
       const { data } = await supabase
         .from("memory_events")
         .select("id, title, event_date, updated_at, status, slug, event_photos(count)")
-        .eq("owner_id", user.id)
+        .eq("owner_id", ownerId)
         .in("status", ["draft", "published"])
         .order("updated_at", { ascending: false });
 
@@ -46,6 +44,8 @@ export default async function StudioDraftsPage() {
           meta: `${count} 张 · 更新于 ${new Date(item.updated_at).toLocaleString("zh-CN")}`,
         };
       });
+    } catch {
+      memories = [];
     }
   }
 

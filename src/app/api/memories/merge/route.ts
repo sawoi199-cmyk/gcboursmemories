@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { mergeMemoryEvents } from "@/features/memories/merge-split";
+import { requireSiteSession } from "@/lib/security/require-site-session";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
-import { createClient } from "@/lib/supabase/server";
 
 const BodySchema = z.object({
   targetId: z.string().uuid(),
@@ -15,12 +15,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, message: "Supabase not configured" }, { status: 503 });
     }
 
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-      return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
+    const session = await requireSiteSession();
+    if (!session.ok) {
+      return NextResponse.json({ ok: false, message: session.message }, { status: session.status });
     }
 
     const json: unknown = await request.json();
@@ -30,7 +27,7 @@ export async function POST(request: Request) {
     }
 
     const result = await mergeMemoryEvents({
-      ownerId: user.id,
+      ownerId: session.ownerId,
       targetId: parsed.data.targetId,
       sourceId: parsed.data.sourceId,
     });

@@ -1,8 +1,16 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { hashPassword } from "@/lib/security/password-hash";
+import {
+  PARTNER_COOKIE_NAME,
+  partnerCookieOptions,
+} from "@/lib/security/partner-session";
+import { requireSiteSession } from "@/lib/security/require-site-session";
+import { createServiceClient } from "@/lib/supabase/admin";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
-import { createClient } from "@/lib/supabase/server";
+
+const DEFAULT_OWNER_NAME = "臭宝";
+const DEFAULT_PARTNER_NAME = "乖宝";
 
 const BodySchema = z.object({
   password: z.string().min(4).max(64),
@@ -15,12 +23,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, message: "Supabase not configured" }, { status: 503 });
     }
 
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-      return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
+    const session = await requireSiteSession();
+    if (!session.ok) {
+      return NextResponse.json({ ok: false, message: session.message }, { status: session.status });
     }
 
     const json: unknown = await request.json();
@@ -33,36 +38,50 @@ export async function POST(request: Request) {
     }
 
     const accessHash = await hashPassword(parsed.data.password);
+    const admin = createServiceClient();
 
-    const { data: existing } = await supabase
+    const { data: existing } = await admin
       .from("relationship_settings")
-      .select("id")
-      .eq("owner_id", user.id)
+      .select("id, password_version")
+      .eq("owner_id", session.ownerId)
       .maybeSingle();
 
     if (existing?.id) {
-      const { error } = await supabase
+      const { error } = await admin
         .from("relationship_settings")
-        .update({ access_hash: accessHash })
+        .update({
+          access_hash: accessHash,
+          password_version: (existing.password_version ?? 0) + 1,
+        })
         .eq("id", existing.id)
-        .eq("owner_id", user.id);
+        .eq("owner_id", session.ownerId);
       if (error) {
         return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
       }
     } else {
-      const { error } = await supabase.from("relationship_settings").insert({
-        owner_id: user.id,
+      const { error } = await admin.from("relationship_settings").insert({
+        owner_id: session.ownerId,
         relationship_title: "OURS",
-        partner_name: "她",
-        owner_name: "我",
+        partner_name: DEFAULT_PARTNER_NAME,
+        owner_name: DEFAULT_OWNER_NAME,
         access_hash: accessHash,
+        password_version: 0,
       });
       if (error) {
         return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
       }
     }
 
-    return NextResponse.json({ ok: true, passwordSet: true });
+    const response = NextResponse.json({
+      ok: true,
+      passwordSet: true,
+      mustReunlock: true,
+    });
+    response.cookies.set(PARTNER_COOKIE_NAME, "", {
+      ...partnerCookieOptions(0),
+      maxAge: 0,
+    });
+    return response;
   } catch (error) {
     return NextResponse.json(
       { ok: false, message: error instanceof Error ? error.message : "Save failed" },
@@ -77,18 +96,16 @@ export async function GET() {
       return NextResponse.json({ ok: false, message: "Supabase not configured" }, { status: 503 });
     }
 
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-      return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
+    const session = await requireSiteSession();
+    if (!session.ok) {
+      return NextResponse.json({ ok: false, message: session.message }, { status: session.status });
     }
 
-    const { data } = await supabase
+    const admin = createServiceClient();
+    const { data } = await admin
       .from("relationship_settings")
       .select("access_hash, partner_name, unlock_title, unlock_hint")
-      .eq("owner_id", user.id)
+      .eq("owner_id", session.ownerId)
       .maybeSingle();
 
     return NextResponse.json({

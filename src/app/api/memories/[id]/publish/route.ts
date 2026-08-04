@@ -3,8 +3,8 @@ import {
   PublishMemorySchema,
   publishMemoryEvent,
 } from "@/features/memories/publish-memory";
+import { requireSiteSession } from "@/lib/security/require-site-session";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
-import { createClient } from "@/lib/supabase/server";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -17,12 +17,9 @@ export async function POST(request: Request, context: RouteContext) {
     }
 
     const { id } = await context.params;
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-      return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
+    const session = await requireSiteSession();
+    if (!session.ok) {
+      return NextResponse.json({ ok: false, message: session.message }, { status: session.status });
     }
 
     const json: unknown = await request.json();
@@ -35,7 +32,7 @@ export async function POST(request: Request, context: RouteContext) {
     }
 
     const result = await publishMemoryEvent({
-      ownerId: user.id,
+      ownerId: session.ownerId,
       memoryId: id,
       slug: parsed.data.slug,
     });

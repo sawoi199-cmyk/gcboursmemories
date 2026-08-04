@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { listDiaryVersions } from "@/features/diary-generation/analyze-memory";
+import { requireSiteSession } from "@/lib/security/require-site-session";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
-import { createClient } from "@/lib/supabase/server";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -14,15 +14,12 @@ export async function GET(_request: Request, context: RouteContext) {
     }
 
     const { id } = await context.params;
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-      return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
+    const session = await requireSiteSession();
+    if (!session.ok) {
+      return NextResponse.json({ ok: false, message: session.message }, { status: session.status });
     }
 
-    const versions = await listDiaryVersions(user.id, id);
+    const versions = await listDiaryVersions(session.ownerId, id);
     return NextResponse.json({ ok: true, versions });
   } catch (error) {
     return NextResponse.json(

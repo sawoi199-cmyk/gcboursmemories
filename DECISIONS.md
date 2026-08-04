@@ -117,3 +117,15 @@ Reason: 自动化能拦回归；真实密钥与云资源不能写进仓库。
 Consequences:
 - `npm run validate` / `npm run test:e2e` 成为发布前标准步骤。
 - 首次上线仍需人工完成 `docs/deploy.md` 与隐私勾选。
+
+## Decision 011
+
+Date: 2026-08-04
+Status: Accepted
+Context: 日常访问不应区分「管理员 Auth 登录」与「对方解锁密码」两道门禁；两人共用同一密码进入前台与 Studio。
+Decision: 整站共用站点密码 + 30 天 HMAC Cookie（`ours_partner_session`，role=`site`，含 `pwdVersion`）。Middleware 与 API 统一 `requireSiteSession`；数据经 Service Role 读写并强制 `owner_id = SITE_OWNER_ID`。首次可用 `SITE_BOOTSTRAP_PASSWORD` 写入 `access_hash`；解锁欢迎「欢迎回来，{partner}和{owner}」（默认乖宝/臭宝）；称呼在 Studio 设置页可改；改密递增 `password_version` 使旧 Cookie 失效。Supabase Auth 退出日常路径（`/auth/login` 重定向 `/unlock`）。
+Reason: 贴合两人私密档案的使用方式；减少误用 Auth 账号的可能；密码轮换可吊销会话。
+Consequences:
+- 生产必须配置 `SITE_OWNER_ID` 与 `SESSION_SIGNING_SECRET`。
+- 应用层必须始终带 `owner_id = SITE_OWNER_ID` 过滤，因 Studio 走 service role 绕过 RLS。
+- `docs/deploy.md`、`.env.example`、e2e 冒烟已更新；不含关系标题/默认日记语气编辑。

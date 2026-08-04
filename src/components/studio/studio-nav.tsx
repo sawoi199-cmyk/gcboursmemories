@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { StudioLogoutButton } from "@/components/studio/studio-logout-button";
 
 const studioLinks = [
   { href: "/studio", label: "概览" },
@@ -25,14 +26,10 @@ export function StudioNav() {
             {link.label}
           </Link>
         ))}
-        <form action="/auth/logout" method="post" className="ml-auto shrink-0">
-          <button
-            type="submit"
-            className="rounded-md px-2 py-1 hover:bg-background hover:text-ink"
-          >
-            退出
-          </button>
-        </form>
+        <StudioLogoutButton
+          label="退出"
+          className="ml-auto shrink-0 rounded-md border-0 bg-transparent px-2 py-1 shadow-none hover:bg-background hover:text-ink"
+        />
         <Link
           href="/"
           className="shrink-0 rounded-md px-2 py-1 hover:bg-background hover:text-ink"

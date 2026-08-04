@@ -6,7 +6,7 @@ import {
   isAcceptedImageMime,
   MAX_UPLOAD_BYTES,
 } from "@/lib/image/thumbnail";
-import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/admin";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 
 export type UploadedPhotoResult = {
@@ -80,7 +80,7 @@ export async function uploadPhotoForOwner(input: {
   const now = new Date();
   const thumbnailPath = `${input.ownerId}/${now.getUTCFullYear()}/${String(now.getUTCMonth() + 1).padStart(2, "0")}/${randomUUID()}.jpg`;
 
-  const supabase = await createClient();
+  const supabase = createServiceClient();
   const { error: storageError } = await supabase.storage
     .from("memory-thumbnails")
     .upload(thumbnailPath, thumbnail.buffer, {

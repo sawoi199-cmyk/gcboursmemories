@@ -4,13 +4,13 @@ import {
   type PhotoGroupCandidate,
 } from "@/features/event-grouping/group-photos";
 import { buildDraftSlug } from "@/lib/utils/slug";
-import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/admin";
 
 export async function createDraftEventsFromPhotos(input: {
   ownerId: string;
   photoIds: string[];
 }) {
-  const supabase = await createClient();
+  const supabase = createServiceClient();
   const { data: photos, error } = await supabase
     .from("photos")
     .select("id, taken_at, latitude, longitude")
@@ -44,7 +44,7 @@ export async function createDraftEventsFromPhotos(input: {
 }
 
 async function insertDraftEvent(
-  supabase: Awaited<ReturnType<typeof createClient>>,
+  supabase: ReturnType<typeof createServiceClient>,
   ownerId: string,
   candidate: PhotoGroupCandidate,
 ) {

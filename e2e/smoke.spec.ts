@@ -12,13 +12,13 @@ test.describe("OURS smoke", () => {
     await expect(page).toHaveURL(/\/unlock/);
   });
 
-  test("studio requires admin login", async ({ page }) => {
+  test("studio requires site unlock", async ({ page }) => {
     await page.goto("/studio");
-    await expect(page).toHaveURL(/\/auth\/login/);
+    await expect(page).toHaveURL(/\/unlock/);
   });
 
-  test("login page renders", async ({ page }) => {
+  test("auth login redirects to unlock", async ({ page }) => {
     await page.goto("/auth/login");
-    await expect(page.getByRole("heading", { name: "管理员登录" })).toBeVisible();
+    await expect(page).toHaveURL(/\/unlock/);
   });
 });

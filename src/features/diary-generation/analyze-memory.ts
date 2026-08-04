@@ -2,7 +2,7 @@ import sharp from "sharp";
 import { createAIProvider, getActiveAIProviderName } from "@/lib/ai";
 import type { MemoryAnalysisResult } from "@/lib/ai/types";
 import { appConfig } from "@/config/app";
-import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/admin";
 
 export type AnalyzeMemoryOptions = {
   ownerId: string;
@@ -13,7 +13,7 @@ export type AnalyzeMemoryOptions = {
 };
 
 export async function analyzeAndApplyMemoryDraft(options: AnalyzeMemoryOptions) {
-  const supabase = await createClient();
+  const supabase = createServiceClient();
 
   const { data: event, error } = await supabase
     .from("memory_events")
@@ -124,7 +124,7 @@ async function applyAnalysisToMemory(input: {
   analysis: MemoryAnalysisResult;
   tone: string;
 }) {
-  const supabase = await createClient();
+  const supabase = createServiceClient();
 
   const { error: versionError } = await supabase.from("diary_versions").insert({
     event_id: input.memoryId,
@@ -178,7 +178,7 @@ async function applyAnalysisToMemory(input: {
 }
 
 export async function listDiaryVersions(ownerId: string, memoryId: string) {
-  const supabase = await createClient();
+  const supabase = createServiceClient();
 
   const { data: owned, error: ownedError } = await supabase
     .from("memory_events")
@@ -205,7 +205,7 @@ export async function restoreDiaryVersion(input: {
   memoryId: string;
   versionId: string;
 }) {
-  const supabase = await createClient();
+  const supabase = createServiceClient();
   const versions = await listDiaryVersions(input.ownerId, input.memoryId);
   const version = versions.find((item) => item.id === input.versionId);
   if (!version) throw new Error("Version not found.");
