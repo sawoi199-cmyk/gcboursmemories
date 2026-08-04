@@ -46,6 +46,7 @@ export type Database = {
           music_enabled: boolean;
           access_hash: string | null;
           chapter_labels: Record<string, string> | null;
+          password_version: number;
           created_at: string;
           updated_at: string;
         };
@@ -66,6 +67,7 @@ export type Database = {
           music_enabled?: boolean;
           access_hash?: string | null;
           chapter_labels?: Record<string, string> | null;
+          password_version?: number;
         };
         Update: Partial<Database["public"]["Tables"]["relationship_settings"]["Insert"]>;
       };

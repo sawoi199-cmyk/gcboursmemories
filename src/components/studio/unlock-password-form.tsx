@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -9,6 +10,7 @@ type UnlockPasswordFormProps = {
 };
 
 export function UnlockPasswordForm({ initiallySet }: UnlockPasswordFormProps) {
+  const router = useRouter();
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordSet, setPasswordSet] = useState(initiallySet);
@@ -27,7 +29,11 @@ export function UnlockPasswordForm({ initiallySet }: UnlockPasswordFormProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ password, confirmPassword }),
       });
-      const json = (await response.json()) as { ok?: boolean; message?: string };
+      const json = (await response.json()) as {
+        ok?: boolean;
+        message?: string;
+        mustReunlock?: boolean;
+      };
       if (!response.ok || !json.ok) {
         setError(json.message ?? "保存失败");
         return;
@@ -35,7 +41,12 @@ export function UnlockPasswordForm({ initiallySet }: UnlockPasswordFormProps) {
       setPasswordSet(true);
       setPassword("");
       setConfirmPassword("");
-      setMessage("解锁密码已更新。");
+      if (json.mustReunlock) {
+        setMessage("密码已更新，请用新密码重新解锁。");
+        router.push("/unlock");
+        return;
+      }
+      setMessage("站点共用密码已更新。");
     } catch {
       setError("网络错误");
     } finally {
@@ -45,9 +56,9 @@ export function UnlockPasswordForm({ initiallySet }: UnlockPasswordFormProps) {
 
   return (
     <form onSubmit={(event) => void onSubmit(event)} className="mt-10 rounded-2xl border border-line bg-paper px-5 py-6">
-      <h2 className="font-serif text-xl text-ink">解锁密码</h2>
+      <h2 className="font-serif text-xl text-ink">站点共用密码</h2>
       <p className="mt-2 text-sm text-muted-ours">
-        对方在 `/unlock` 输入此密码后才能进入前台。当前状态：
+        进入整站（前台与 Studio）需输入此密码。当前状态：
         <span className="text-ink">{passwordSet ? "已设置" : "未设置"}</span>
       </p>
       <label className="mt-4 block text-xs text-muted-ours" htmlFor="unlock-password">
@@ -79,7 +90,7 @@ export function UnlockPasswordForm({ initiallySet }: UnlockPasswordFormProps) {
       {error ? <p className="mt-2 text-xs text-accent-ours">{error}</p> : null}
       {message ? <p className="mt-2 text-xs text-muted-ours">{message}</p> : null}
       <button type="submit" disabled={busy} className={cn(buttonVariants({ size: "sm" }), "mt-4")}>
-        {busy ? "保存中…" : "保存解锁密码"}
+        {busy ? "保存中…" : "保存站点密码"}
       </button>
     </form>
   );

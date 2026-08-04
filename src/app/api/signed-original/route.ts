@@ -1,13 +1,8 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
 import { fetchDriveFile } from "@/lib/google-drive/gas-client";
-import {
-  PARTNER_COOKIE_NAME,
-  verifyPartnerSessionToken,
-} from "@/lib/security/partner-session";
+import { requireSiteSession } from "@/lib/security/require-site-session";
 import { createServiceClient } from "@/lib/supabase/admin";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
-import { createClient } from "@/lib/supabase/server";
 
 export async function GET(request: Request) {
   try {
@@ -21,19 +16,9 @@ export async function GET(request: Request) {
       return NextResponse.json({ ok: false, message: "photoId required" }, { status: 400 });
     }
 
-    const cookieStore = await cookies();
-    const partnerToken = cookieStore.get(PARTNER_COOKIE_NAME)?.value;
-    const partnerOk = partnerToken
-      ? (await verifyPartnerSessionToken(partnerToken)).ok
-      : false;
-
-    const supabaseUser = await createClient();
-    const {
-      data: { user },
-    } = await supabaseUser.auth.getUser();
-
-    if (!partnerOk && !user) {
-      return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
+    const session = await requireSiteSession();
+    if (!session.ok) {
+      return NextResponse.json({ ok: false, message: session.message }, { status: session.status });
     }
 
     const admin = createServiceClient();
@@ -47,7 +32,9 @@ export async function GET(request: Request) {
       return NextResponse.json({ ok: false, message: "Not found" }, { status: 404 });
     }
 
-    if (partnerOk) {
+    if (photo.owner_id === session.ownerId) {
+      // Site owner (studio) may access originals for any owned photo, including drafts.
+    } else {
       const { data: links } = await admin
         .from("event_photos")
         .select("event_id")
@@ -66,10 +53,6 @@ export async function GET(request: Request) {
         .limit(1);
 
       if (!publishedEvents?.length) {
-        return NextResponse.json({ ok: false, message: "Forbidden" }, { status: 403 });
-      }
-    } else if (user) {
-      if (photo.owner_id !== user.id) {
         return NextResponse.json({ ok: false, message: "Forbidden" }, { status: 403 });
       }
     }

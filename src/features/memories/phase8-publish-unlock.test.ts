@@ -19,7 +19,7 @@ describe("Phase 8 integration-ish security + publish helpers", () => {
 
   it("partner session round-trips with signing secret", async () => {
     process.env.SESSION_SIGNING_SECRET = "phase8-test-secret-value!!";
-    const token = await createPartnerSessionToken();
+    const token = await createPartnerSessionToken(0);
     const verified = await verifyPartnerSessionToken(token);
     expect(verified.ok).toBe(true);
   });

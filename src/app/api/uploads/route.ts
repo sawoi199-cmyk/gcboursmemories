@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { uploadPhotoForOwner } from "@/features/uploads/upload-photo";
 import { isDriveConfigured } from "@/lib/google-drive/gas-client";
+import { requireSiteSession } from "@/lib/security/require-site-session";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
-import { createClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
@@ -21,13 +21,9 @@ export async function POST(request: Request) {
       );
     }
 
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
+    const session = await requireSiteSession();
+    if (!session.ok) {
+      return NextResponse.json({ ok: false, message: session.message }, { status: session.status });
     }
 
     const form = await request.formData();
@@ -39,7 +35,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const photo = await uploadPhotoForOwner({ ownerId: user.id, file });
+    const photo = await uploadPhotoForOwner({ ownerId: session.ownerId, file });
     return NextResponse.json({ ok: true, photo });
   } catch (error) {
     return NextResponse.json(

@@ -1,5 +1,9 @@
 import { appConfig } from "@/config/app";
-import { createClient } from "@/lib/supabase/server";
+import {
+  resolveChapterLabels,
+  type ChapterId,
+} from "@/config/chapters";
+import { createServiceClient } from "@/lib/supabase/admin";
 import type { EventPhoto, MemoryEvent, PhotoRole } from "@/types/memory";
 
 export type EditorPhoto = EventPhoto & {
@@ -25,6 +29,8 @@ export type EditorMemoryPayload = {
     source: string;
     created_at: string;
   }>;
+  /** Resolved display labels (defaults + site_settings.chapter_labels). */
+  chapterLabels: Record<ChapterId, string>;
 };
 
 function gradientForIndex(index: number) {
@@ -41,7 +47,7 @@ export async function getEditorMemory(
   ownerId: string,
   memoryId: string,
 ): Promise<EditorMemoryPayload | null> {
-  const supabase = await createClient();
+  const supabase = createServiceClient();
 
   const { data: event, error } = await supabase
     .from("memory_events")
@@ -119,6 +125,16 @@ export async function getEditorMemory(
     .order("created_at", { ascending: false })
     .limit(20);
 
+  const { data: settings } = await supabase
+    .from("site_settings")
+    .select("chapter_labels")
+    .eq("owner_id", ownerId)
+    .maybeSingle();
+
+  const chapterLabels = resolveChapterLabels(
+    (settings?.chapter_labels as Partial<Record<ChapterId, string>> | null) ?? null,
+  );
+
   return {
     memory: {
       id: event.id,
@@ -142,5 +158,6 @@ export async function getEditorMemory(
       eventDate: item.event_date,
     })),
     diaryVersions: diaryVersions ?? [],
+    chapterLabels,
   };
 }

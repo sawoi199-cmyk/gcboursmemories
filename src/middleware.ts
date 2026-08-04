@@ -1,4 +1,3 @@
-import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import {
   PARTNER_COOKIE_NAME,
@@ -11,80 +10,48 @@ function isExperiencePath(pathname: string) {
   return prefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
 }
 
+function isStudioRoute(pathname: string) {
+  return pathname.startsWith("/studio");
+}
+
+async function hasValidSiteSession(request: NextRequest): Promise<boolean> {
+  const token = request.cookies.get(PARTNER_COOKIE_NAME)?.value;
+  if (!token) {
+    return false;
+  }
+  const verified = await verifyPartnerSessionToken(token);
+  // Middleware checks HMAC, expiry, and token pwdVersion field only.
+  // DB password_version is enforced in requireSiteSession() on API routes.
+  return verified.ok;
+}
+
 export async function middleware(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({ request });
-
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  let userId: string | null = null;
-
-  if (url && anonKey) {
-    const supabase = createServerClient(url, anonKey, {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) => {
-            request.cookies.set(name, value);
-          });
-          supabaseResponse = NextResponse.next({ request });
-          cookiesToSet.forEach(({ name, value, options }) => {
-            supabaseResponse.cookies.set(name, value, options);
-          });
-        },
-      },
-    });
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    userId = user?.id ?? null;
-  }
-
   const pathname = request.nextUrl.pathname;
-  const isStudioRoute = pathname.startsWith("/studio");
-  const isLogin = pathname.startsWith("/auth/login");
-  const isAuthRoute =
-    pathname.startsWith("/auth/login") || pathname.startsWith("/auth/callback");
 
-  if (isStudioRoute && !userId) {
-    const redirectUrl = request.nextUrl.clone();
-    redirectUrl.pathname = "/auth/login";
-    redirectUrl.searchParams.set("next", pathname);
-    return NextResponse.redirect(redirectUrl);
+  if (pathname.startsWith("/auth/login")) {
+    const unlockUrl = request.nextUrl.clone();
+    unlockUrl.pathname = "/unlock";
+    unlockUrl.search = "";
+    return NextResponse.redirect(unlockUrl);
   }
 
-  if (isLogin && userId) {
-    const redirectUrl = request.nextUrl.clone();
-    redirectUrl.pathname = "/studio";
-    redirectUrl.search = "";
-    return NextResponse.redirect(redirectUrl);
+  if (pathname === "/unlock" || pathname.startsWith("/auth/callback")) {
+    return NextResponse.next();
   }
 
-  if (isAuthRoute) {
-    return supabaseResponse;
-  }
+  const needsGate = isStudioRoute(pathname) || isExperiencePath(pathname);
 
-  if (isExperiencePath(pathname)) {
-    const partnerToken = request.cookies.get(PARTNER_COOKIE_NAME)?.value;
-    const partnerOk = partnerToken
-      ? (await verifyPartnerSessionToken(partnerToken)).ok
-      : false;
-    if (!partnerOk && !userId) {
+  if (needsGate) {
+    const sessionOk = await hasValidSiteSession(request);
+    if (!sessionOk) {
       const unlockUrl = request.nextUrl.clone();
       unlockUrl.pathname = "/unlock";
       unlockUrl.search = "";
-      const redirect = NextResponse.redirect(unlockUrl);
-      supabaseResponse.cookies.getAll().forEach((cookie) => {
-        redirect.cookies.set(cookie.name, cookie.value);
-      });
-      return redirect;
+      return NextResponse.redirect(unlockUrl);
     }
   }
 
-  return supabaseResponse;
+  return NextResponse.next();
 }
 
 export const config = {

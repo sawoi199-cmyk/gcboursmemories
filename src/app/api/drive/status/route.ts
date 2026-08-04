@@ -1,16 +1,13 @@
 import { NextResponse } from "next/server";
 import { getDriveConnectionStatus } from "@/lib/google-drive/gas-client";
-import { createClient } from "@/lib/supabase/server";
+import { requireSiteSession } from "@/lib/security/require-site-session";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 
 export async function GET() {
   if (isSupabaseConfigured()) {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-      return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
+    const session = await requireSiteSession();
+    if (!session.ok) {
+      return NextResponse.json({ ok: false, message: session.message }, { status: session.status });
     }
   }
 

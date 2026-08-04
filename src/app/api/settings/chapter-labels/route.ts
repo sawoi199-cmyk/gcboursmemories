@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { CHAPTER_IDS, resolveChapterLabels, type ChapterId } from "@/config/chapters";
+import { requireSiteSession } from "@/lib/security/require-site-session";
+import { createServiceClient } from "@/lib/supabase/admin";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
-import { createClient } from "@/lib/supabase/server";
 
 const BodySchema = z.object({
   labels: z.record(z.string(), z.string().max(40)),
@@ -13,18 +14,16 @@ export async function GET() {
     if (!isSupabaseConfigured()) {
       return NextResponse.json({ ok: false, message: "Supabase not configured" }, { status: 503 });
     }
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-      return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
+    const session = await requireSiteSession();
+    if (!session.ok) {
+      return NextResponse.json({ ok: false, message: session.message }, { status: session.status });
     }
 
+    const supabase = createServiceClient();
     const { data } = await supabase
       .from("relationship_settings")
       .select("chapter_labels")
-      .eq("owner_id", user.id)
+      .eq("owner_id", session.ownerId)
       .maybeSingle();
 
     const labels = resolveChapterLabels(
@@ -44,12 +43,9 @@ export async function POST(request: Request) {
     if (!isSupabaseConfigured()) {
       return NextResponse.json({ ok: false, message: "Supabase not configured" }, { status: 503 });
     }
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-      return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
+    const session = await requireSiteSession();
+    if (!session.ok) {
+      return NextResponse.json({ ok: false, message: session.message }, { status: session.status });
     }
 
     const json: unknown = await request.json();
@@ -65,10 +61,11 @@ export async function POST(request: Request) {
     }
     const labels = resolveChapterLabels(custom);
 
+    const supabase = createServiceClient();
     const { data: existing } = await supabase
       .from("relationship_settings")
       .select("id")
-      .eq("owner_id", user.id)
+      .eq("owner_id", session.ownerId)
       .maybeSingle();
 
     if (existing?.id) {
@@ -76,13 +73,13 @@ export async function POST(request: Request) {
         .from("relationship_settings")
         .update({ chapter_labels: labels })
         .eq("id", existing.id)
-        .eq("owner_id", user.id);
+        .eq("owner_id", session.ownerId);
       if (error) {
         return NextResponse.json({ ok: false, message: error.message }, { status: 500 });
       }
     } else {
       const { error } = await supabase.from("relationship_settings").insert({
-        owner_id: user.id,
+        owner_id: session.ownerId,
         relationship_title: "OURS",
         partner_name: "她",
         owner_name: "我",

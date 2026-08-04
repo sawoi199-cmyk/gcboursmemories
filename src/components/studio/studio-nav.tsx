@@ -1,4 +1,8 @@
+"use client";
+
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 
 const studioLinks = [
   { href: "/studio", label: "概览" },
@@ -9,6 +13,19 @@ const studioLinks = [
 ] as const;
 
 export function StudioNav() {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+
+  async function handleLogout() {
+    setBusy(true);
+    try {
+      await fetch("/api/unlock/logout", { method: "POST" });
+    } finally {
+      router.push("/unlock");
+      router.refresh();
+    }
+  }
+
   return (
     <header className="sticky top-0 z-40 border-b border-line bg-paper/90 backdrop-blur-md">
       <nav
@@ -25,14 +42,14 @@ export function StudioNav() {
             {link.label}
           </Link>
         ))}
-        <form action="/auth/logout" method="post" className="ml-auto shrink-0">
-          <button
-            type="submit"
-            className="rounded-md px-2 py-1 hover:bg-background hover:text-ink"
-          >
-            退出
-          </button>
-        </form>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => void handleLogout()}
+          className="ml-auto shrink-0 rounded-md px-2 py-1 hover:bg-background hover:text-ink disabled:opacity-60"
+        >
+          退出
+        </button>
         <Link
           href="/"
           className="shrink-0 rounded-md px-2 py-1 hover:bg-background hover:text-ink"

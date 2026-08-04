@@ -2,8 +2,9 @@ export const PARTNER_COOKIE_NAME = "ours_partner_session";
 export const PARTNER_SESSION_TTL_SECONDS = 60 * 60 * 24 * 30; // 30 days
 
 type PartnerSessionPayload = {
-  role: "partner";
+  role: "site";
   exp: number;
+  pwdVersion: number;
 };
 
 function getSigningSecret() {
@@ -51,12 +52,14 @@ async function sign(body: string) {
 }
 
 export async function createPartnerSessionToken(
+  pwdVersion: number,
   nowMs = Date.now(),
   ttlSeconds = PARTNER_SESSION_TTL_SECONDS,
 ) {
   const payload: PartnerSessionPayload = {
-    role: "partner",
+    role: "site",
     exp: Math.floor(nowMs / 1000) + ttlSeconds,
+    pwdVersion,
   };
   const body = encodePayload(payload);
   return `${body}.${await sign(body)}`;
@@ -65,7 +68,7 @@ export async function createPartnerSessionToken(
 export async function verifyPartnerSessionToken(
   token: string,
   nowMs = Date.now(),
-): Promise<{ ok: true; exp: number } | { ok: false; reason: string }> {
+): Promise<{ ok: true; exp: number; pwdVersion: number } | { ok: false; reason: string }> {
   const [body, signature] = token.split(".");
   if (!body || !signature) {
     return { ok: false, reason: "malformed" };
@@ -95,13 +98,17 @@ export async function verifyPartnerSessionToken(
     const json = JSON.parse(
       new TextDecoder().decode(fromBase64Url(body)),
     ) as PartnerSessionPayload;
-    if (json.role !== "partner" || typeof json.exp !== "number") {
+    if (
+      json.role !== "site" ||
+      typeof json.exp !== "number" ||
+      typeof json.pwdVersion !== "number"
+    ) {
       return { ok: false, reason: "payload" };
     }
     if (json.exp * 1000 <= nowMs) {
       return { ok: false, reason: "expired" };
     }
-    return { ok: true, exp: json.exp };
+    return { ok: true, exp: json.exp, pwdVersion: json.pwdVersion };
   } catch {
     return { ok: false, reason: "payload" };
   }

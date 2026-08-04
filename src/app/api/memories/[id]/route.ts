@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { getEditorMemory } from "@/features/memories/get-editor-memory";
 import { SaveMemorySchema, saveMemoryEvent } from "@/features/memories/save-memory";
+import { requireSiteSession } from "@/lib/security/require-site-session";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
-import { createClient } from "@/lib/supabase/server";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -15,15 +15,12 @@ export async function GET(_request: Request, context: RouteContext) {
     }
 
     const { id } = await context.params;
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-      return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
+    const session = await requireSiteSession();
+    if (!session.ok) {
+      return NextResponse.json({ ok: false, message: session.message }, { status: session.status });
     }
 
-    const payload = await getEditorMemory(user.id, id);
+    const payload = await getEditorMemory(session.ownerId, id);
     if (!payload) {
       return NextResponse.json({ ok: false, message: "Not found" }, { status: 404 });
     }
@@ -44,12 +41,9 @@ export async function PATCH(request: Request, context: RouteContext) {
     }
 
     const { id } = await context.params;
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-      return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
+    const session = await requireSiteSession();
+    if (!session.ok) {
+      return NextResponse.json({ ok: false, message: session.message }, { status: session.status });
     }
 
     const json: unknown = await request.json();
@@ -59,7 +53,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     }
 
     const result = await saveMemoryEvent({
-      ownerId: user.id,
+      ownerId: session.ownerId,
       memoryId: id,
       payload: parsed.data,
     });

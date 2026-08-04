@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { buildDraftSlug } from "@/lib/utils/slug";
-import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/admin";
 
 export async function mergeMemoryEvents(input: {
   ownerId: string;
@@ -11,7 +11,7 @@ export async function mergeMemoryEvents(input: {
     throw new Error("Cannot merge an event with itself.");
   }
 
-  const supabase = await createClient();
+  const supabase = createServiceClient();
 
   const { data: events, error } = await supabase
     .from("memory_events")
@@ -81,7 +81,7 @@ export async function splitMemoryEvent(input: {
     throw new Error("Select at least one photo to split out.");
   }
 
-  const supabase = await createClient();
+  const supabase = createServiceClient();
 
   const { data: event, error } = await supabase
     .from("memory_events")

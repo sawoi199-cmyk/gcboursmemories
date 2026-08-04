@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { CHAPTER_IDS } from "@/config/chapters";
-import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/admin";
 
 export const SaveMemorySchema = z.object({
   title: z.string().min(1).max(120),
@@ -36,7 +36,7 @@ export async function saveMemoryEvent(input: {
   memoryId: string;
   payload: SaveMemoryInput;
 }) {
-  const supabase = await createClient();
+  const supabase = createServiceClient();
   const coverPhotoId = input.payload.photoOrder[0]?.photoId ?? null;
 
   const { error: updateError } = await supabase

@@ -6,7 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { PhotoPlaceholder } from "@/components/experience/photo-placeholder";
 import { FadeIn } from "@/components/motion/fade-in";
 import { buttonVariants } from "@/components/ui/button";
-import { CHAPTER_IDS, DEFAULT_CHAPTER_LABELS, type ChapterId } from "@/config/chapters";
+import { CHAPTER_IDS, type ChapterId } from "@/config/chapters";
 import type { EditorMemoryPayload, EditorPhoto } from "@/features/memories/get-editor-memory";
 import { memoryTemplates, MemoryLayoutRenderer } from "@/features/templates/registry";
 import { cn } from "@/lib/utils";
@@ -594,7 +594,7 @@ export function MemoryEditor({ initial }: MemoryEditorProps) {
             >
               {CHAPTER_IDS.map((id) => (
                 <option key={id} value={id}>
-                  {DEFAULT_CHAPTER_LABELS[id]}
+                  {initial.chapterLabels[id]}
                 </option>
               ))}
             </select>
