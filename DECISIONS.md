@@ -140,3 +140,14 @@ Reason: 消除无效表单；编辑器已有完整 AI 输入与持久化，无�
 Consequences:
 - 上传流程更短；SPEC 中「向导内补充记忆再生成」改为「编辑器内补充并生成」。
 - 向导不再预览日记/版式。
+
+## Decision 013
+
+Date: 2026-08-04
+Status: Accepted
+Context: 前台导航（时间线/故事等）每次点击都 `force-dynamic` 全量读库并为每张缩略图单独签名，体感 2–3 秒，慢于常见网站。
+Decision: 列表页只签封面并用 `createSignedUrls` 批量签名；故事页独立轻量查询；`unstable_cache`（60s，`published-archive` tag）缓存已发布读路径；发布/取消发布/保存/改章节标签时 `revalidateTag(..., { expire: 0 })`；体验路由加 `loading.tsx` 骨架。
+Reason: 私密站不宜公开 CDN 长缓存；短服务端 Data Cache + 按需失效既快又安全；骨架改善体感。
+Consequences:
+- 发布后前台最多延迟至下次失效（立即 revalidate）；缓存内 signed URL 仍在 1h TTL 内。
+- 时间线 payload 仅含封面图，详情仍按 slug 加载全部照片。

@@ -1,3 +1,4 @@
+import { unstable_cache, revalidateTag } from "next/cache";
 import { appConfig } from "@/config/app";
 import {
   CHAPTER_IDS,
@@ -8,6 +9,12 @@ import { tryGetSiteOwnerId } from "@/lib/config/site-owner";
 import { createServiceClient } from "@/lib/supabase/admin";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import type { EventPhoto, MemoryEvent, MemoryStatus } from "@/types/memory";
+
+/** Shared tag for timeline / story / home / detail published reads. */
+export const PUBLISHED_CACHE_TAG = "published-archive";
+
+/** Short server cache; signed URLs remain valid (TTL 1h). */
+const PUBLISHED_CACHE_REVALIDATE_SECONDS = 60;
 
 export type PublishedMemory = MemoryEvent & {
   publishedAt: string | null;
@@ -74,6 +81,8 @@ type PhotoLinkRow = {
     | null;
 };
 
+type ServiceClient = ReturnType<typeof createServiceClient>;
+
 function gradientForIndex(index: number) {
   const presets = [
     "linear-gradient(145deg,#1b1d22,#b46a6a55,#f6f1ea)",
@@ -84,15 +93,31 @@ function gradientForIndex(index: number) {
   return presets[index % presets.length];
 }
 
-async function signThumbnail(
-  path: string | null,
-  supabase: ReturnType<typeof createServiceClient>,
-) {
-  if (!path) return null;
+/** Prefer explicit cover role; otherwise first by sort_order. */
+export function pickCoverLink(links: PhotoLinkRow[]): PhotoLinkRow | null {
+  if (links.length === 0) return null;
+  const cover = links.find((link) => link.role === "cover");
+  return cover ?? links[0] ?? null;
+}
+
+async function signThumbnailsBatch(
+  supabase: ServiceClient,
+  paths: string[],
+): Promise<Map<string, string>> {
+  const unique = [...new Set(paths.filter(Boolean))];
+  const signedByPath = new Map<string, string>();
+  if (unique.length === 0) return signedByPath;
+
   const { data } = await supabase.storage
     .from("memory-thumbnails")
-    .createSignedUrl(path, appConfig.signedUrlTtlSeconds);
-  return data?.signedUrl ?? null;
+    .createSignedUrls(unique, appConfig.signedUrlTtlSeconds);
+
+  for (const item of data ?? []) {
+    if (item.path && item.signedUrl) {
+      signedByPath.set(item.path, item.signedUrl);
+    }
+  }
+  return signedByPath;
 }
 
 function emptyHomeStats(): HomeStats {
@@ -169,8 +194,19 @@ function mapEventRow(event: EventRow, photos: PublishedMemory["photos"]): Publis
   };
 }
 
+function groupLinksByEvent(links: PhotoLinkRow[]) {
+  const linksByEvent = new Map<string, PhotoLinkRow[]>();
+  for (const link of links) {
+    if (!link.event_id) continue;
+    const list = linksByEvent.get(link.event_id) ?? [];
+    list.push(link);
+    linksByEvent.set(link.event_id, list);
+  }
+  return linksByEvent;
+}
+
 async function loadPhotosForEvent(
-  supabase: ReturnType<typeof createServiceClient>,
+  supabase: ServiceClient,
   eventId: string,
   gradientBase: number,
 ): Promise<PublishedMemory["photos"]> {
@@ -183,14 +219,24 @@ async function loadPhotosForEvent(
     .order("sort_order", { ascending: true });
 
   const rows = (links ?? []) as PhotoLinkRow[];
-  const signed = await Promise.all(
-    rows.map(async (link, photoIndex) => {
+  const paths = rows
+    .map((link) => {
       const photo = Array.isArray(link.photos) ? link.photos[0] : link.photos;
-      const thumbnailUrl = await signThumbnail(photo?.thumbnail_path ?? null, supabase);
+      return photo?.thumbnail_path ?? null;
+    })
+    .filter((path): path is string => Boolean(path));
+
+  const signedByPath = await signThumbnailsBatch(supabase, paths);
+
+  return rows
+    .map((link, photoIndex) => {
+      const photo = Array.isArray(link.photos) ? link.photos[0] : link.photos;
+      const thumbnailUrl = photo?.thumbnail_path
+        ? (signedByPath.get(photo.thumbnail_path) ?? null)
+        : null;
       return mapPhotoFromLink(link, gradientBase + photoIndex, thumbnailUrl);
-    }),
-  );
-  return signed.filter((photo): photo is NonNullable<typeof photo> => Boolean(photo));
+    })
+    .filter((photo): photo is NonNullable<typeof photo> => Boolean(photo));
 }
 
 /** Pure helper for prev/next from a lightweight ordered list. */
@@ -209,15 +255,12 @@ export function neighborsFromOrderedList<T extends { slug: string }>(
   };
 }
 
-export async function getHomeStats(): Promise<HomeStats> {
-  if (!isSupabaseConfigured()) {
-    return emptyHomeStats();
-  }
+/** Invalidate timeline / story / home / detail published caches immediately. */
+export function revalidatePublishedArchive() {
+  revalidateTag(PUBLISHED_CACHE_TAG, { expire: 0 });
+}
 
-  const ownerId = tryGetSiteOwnerId();
-  if (!ownerId) {
-    return emptyHomeStats();
-  }
+async function fetchHomeStatsForOwner(ownerId: string): Promise<HomeStats> {
   const supabase = createServiceClient();
   let { data: settings } = await supabase
     .from("relationship_settings")
@@ -275,16 +318,35 @@ export async function getHomeStats(): Promise<HomeStats> {
   };
 }
 
-export async function getPublishedMemories(): Promise<PublishedMemory[]> {
-  if (!isSupabaseConfigured()) return [];
+export async function getHomeStats(): Promise<HomeStats> {
+  if (!isSupabaseConfigured()) {
+    return emptyHomeStats();
+  }
 
   const ownerId = tryGetSiteOwnerId();
-  if (!ownerId) return [];
+  if (!ownerId) {
+    return emptyHomeStats();
+  }
+
+  return unstable_cache(
+    () => fetchHomeStatsForOwner(ownerId),
+    ["home-stats", ownerId],
+    {
+      revalidate: PUBLISHED_CACHE_REVALIDATE_SECONDS,
+      tags: [PUBLISHED_CACHE_TAG],
+    },
+  )();
+}
+
+/** Timeline list: cover photo only + batch signed URLs. */
+async function fetchPublishedMemoriesForOwner(
+  ownerId: string,
+): Promise<PublishedMemory[]> {
   const supabase = createServiceClient();
   const { data: events, error } = await supabase
     .from("memory_events")
     .select(
-      "id, slug, title, subtitle, one_line, diary_body, event_date, place_name, template_id, status, mood, chapter, published_at",
+      "id, slug, title, subtitle, one_line, event_date, place_name, template_id, status, mood, chapter, published_at",
     )
     .eq("owner_id", ownerId)
     .eq("status", "published")
@@ -294,7 +356,10 @@ export async function getPublishedMemories(): Promise<PublishedMemory[]> {
   if (error) throw new Error(error.message);
   if (!events?.length) return [];
 
-  const eventRows = events as EventRow[];
+  const eventRows = events.map((event) => ({
+    ...event,
+    diary_body: null,
+  })) as EventRow[];
   const eventIds = eventRows.map((event) => event.id);
 
   const { data: allLinks, error: linksError } = await supabase
@@ -307,51 +372,56 @@ export async function getPublishedMemories(): Promise<PublishedMemory[]> {
 
   if (linksError) throw new Error(linksError.message);
 
-  const linksByEvent = new Map<string, PhotoLinkRow[]>();
-  for (const link of (allLinks ?? []) as PhotoLinkRow[]) {
-    if (!link.event_id) continue;
-    const list = linksByEvent.get(link.event_id) ?? [];
-    list.push(link);
-    linksByEvent.set(link.event_id, list);
+  const linksByEvent = groupLinksByEvent((allLinks ?? []) as PhotoLinkRow[]);
+  const coverByEvent = new Map<string, PhotoLinkRow>();
+  const pathsToSign: string[] = [];
+
+  for (const event of eventRows) {
+    const cover = pickCoverLink(linksByEvent.get(event.id) ?? []);
+    if (!cover) continue;
+    coverByEvent.set(event.id, cover);
+    const photo = Array.isArray(cover.photos) ? cover.photos[0] : cover.photos;
+    if (photo?.thumbnail_path) pathsToSign.push(photo.thumbnail_path);
   }
 
-  const pathsToSign = new Set<string>();
-  for (const links of linksByEvent.values()) {
-    for (const link of links) {
-      const photo = Array.isArray(link.photos) ? link.photos[0] : link.photos;
-      if (photo?.thumbnail_path) pathsToSign.add(photo.thumbnail_path);
-    }
-  }
-
-  const signedEntries = await Promise.all(
-    [...pathsToSign].map(async (path) => [path, await signThumbnail(path, supabase)] as const),
-  );
-  const signedByPath = new Map(signedEntries);
+  const signedByPath = await signThumbnailsBatch(supabase, pathsToSign);
 
   return eventRows.map((event, index) => {
-    const links = linksByEvent.get(event.id) ?? [];
-    const photos = links
-      .map((link, photoIndex) => {
-        const photo = Array.isArray(link.photos) ? link.photos[0] : link.photos;
-        const thumbnailUrl = photo?.thumbnail_path
-          ? (signedByPath.get(photo.thumbnail_path) ?? null)
-          : null;
-        return mapPhotoFromLink(link, index + photoIndex, thumbnailUrl);
-      })
-      .filter((photo): photo is NonNullable<typeof photo> => Boolean(photo));
-    return mapEventRow(event, photos);
+    const cover = coverByEvent.get(event.id);
+    if (!cover) return mapEventRow(event, []);
+    const photo = Array.isArray(cover.photos) ? cover.photos[0] : cover.photos;
+    const thumbnailUrl = photo?.thumbnail_path
+      ? (signedByPath.get(photo.thumbnail_path) ?? null)
+      : null;
+    const mapped = mapPhotoFromLink(cover, index, thumbnailUrl);
+    return mapEventRow(event, mapped ? [mapped] : []);
   });
 }
 
-export async function getPublishedMemoryBySlug(slug: string): Promise<{
+export async function getPublishedMemories(): Promise<PublishedMemory[]> {
+  if (!isSupabaseConfigured()) return [];
+
+  const ownerId = tryGetSiteOwnerId();
+  if (!ownerId) return [];
+
+  return unstable_cache(
+    () => fetchPublishedMemoriesForOwner(ownerId),
+    ["published-memories", ownerId],
+    {
+      revalidate: PUBLISHED_CACHE_REVALIDATE_SECONDS,
+      tags: [PUBLISHED_CACHE_TAG],
+    },
+  )();
+}
+
+async function fetchPublishedMemoryBySlugForOwner(
+  ownerId: string,
+  slug: string,
+): Promise<{
   memory: PublishedMemory;
   prev: PublishedMemoryNav | null;
   next: PublishedMemoryNav | null;
 } | null> {
-  if (!isSupabaseConfigured()) return null;
-
-  const ownerId = tryGetSiteOwnerId();
-  if (!ownerId) return null;
   const supabase = createServiceClient();
 
   const { data: event, error } = await supabase
@@ -368,25 +438,45 @@ export async function getPublishedMemoryBySlug(slug: string): Promise<{
   if (!event) return null;
 
   const eventRow = event as EventRow;
-  const photos = await loadPhotosForEvent(supabase, eventRow.id, 0);
+  const [photos, navRowsResult] = await Promise.all([
+    loadPhotosForEvent(supabase, eventRow.id, 0),
+    supabase
+      .from("memory_events")
+      .select("slug, title, event_date, published_at")
+      .eq("owner_id", ownerId)
+      .eq("status", "published")
+      .order("event_date", { ascending: true })
+      .order("published_at", { ascending: true }),
+  ]);
+
   const memory = mapEventRow(eventRow, photos);
-
-  // Lightweight neighbor list: no photos / no signed URLs.
-  const { data: navRows } = await supabase
-    .from("memory_events")
-    .select("slug, title, event_date, published_at")
-    .eq("owner_id", ownerId)
-    .eq("status", "published")
-    .order("event_date", { ascending: true })
-    .order("published_at", { ascending: true });
-
-  const { prev, next } = neighborsFromOrderedList(navRows ?? [], slug);
+  const { prev, next } = neighborsFromOrderedList(navRowsResult.data ?? [], slug);
 
   return {
     memory,
     prev: prev ? { slug: prev.slug, title: prev.title } : null,
     next: next ? { slug: next.slug, title: next.title } : null,
   };
+}
+
+export async function getPublishedMemoryBySlug(slug: string): Promise<{
+  memory: PublishedMemory;
+  prev: PublishedMemoryNav | null;
+  next: PublishedMemoryNav | null;
+} | null> {
+  if (!isSupabaseConfigured()) return null;
+
+  const ownerId = tryGetSiteOwnerId();
+  if (!ownerId) return null;
+
+  return unstable_cache(
+    () => fetchPublishedMemoryBySlugForOwner(ownerId, slug),
+    ["published-memory", ownerId, slug],
+    {
+      revalidate: PUBLISHED_CACHE_REVALIDATE_SECONDS,
+      tags: [PUBLISHED_CACHE_TAG],
+    },
+  )();
 }
 
 export type StoryChapter = {
@@ -399,57 +489,131 @@ export type StoryChapter = {
   coverGradient: string;
 };
 
-export async function getStoryChapters(): Promise<StoryChapter[]> {
-  const memories = await getPublishedMemories();
-  let customLabels: Partial<Record<ChapterId, string>> | null = null;
-  if (isSupabaseConfigured()) {
-    const ownerId = tryGetSiteOwnerId();
-    if (ownerId) {
-      const supabase = createServiceClient();
-      const { data: settings } = await supabase
-        .from("relationship_settings")
-        .select("chapter_labels")
-        .eq("owner_id", ownerId)
-        .maybeSingle();
-      customLabels =
-        (settings?.chapter_labels as Partial<Record<ChapterId, string>> | null) ?? null;
-    }
-  }
-  const labels = resolveChapterLabels(customLabels);
-  const order = [...CHAPTER_IDS];
-  const groups = new Map<string, PublishedMemory[]>();
+type StoryEventRow = {
+  id: string;
+  title: string;
+  one_line: string | null;
+  event_date: string;
+  chapter: string | null;
+};
 
-  for (const memory of memories) {
+async function fetchStoryChaptersForOwner(ownerId: string): Promise<StoryChapter[]> {
+  const supabase = createServiceClient();
+
+  const [eventsResult, settingsResult] = await Promise.all([
+    supabase
+      .from("memory_events")
+      .select("id, title, one_line, event_date, chapter")
+      .eq("owner_id", ownerId)
+      .eq("status", "published")
+      .order("event_date", { ascending: true })
+      .order("published_at", { ascending: true }),
+    supabase
+      .from("relationship_settings")
+      .select("chapter_labels")
+      .eq("owner_id", ownerId)
+      .maybeSingle(),
+  ]);
+
+  if (eventsResult.error) throw new Error(eventsResult.error.message);
+
+  const labels = resolveChapterLabels(
+    (settingsResult.data?.chapter_labels as Partial<
+      Record<ChapterId, string>
+    > | null) ?? null,
+  );
+
+  const events = (eventsResult.data ?? []) as StoryEventRow[];
+  const groups = new Map<string, StoryEventRow[]>();
+
+  for (const event of events) {
     const key =
-      memory.chapter && isChapterKey(memory.chapter, labels)
-        ? memory.chapter
+      event.chapter && isChapterKey(event.chapter, labels)
+        ? event.chapter
         : "ordinary_days";
     const list = groups.get(key) ?? [];
-    list.push(memory);
+    list.push(event);
     groups.set(key, list);
   }
 
-  return order
-    .filter((key) => (groups.get(key)?.length ?? 0) > 0)
-    .map((key, index) => {
-      const list = groups.get(key) ?? [];
-      const dates = list.map((item) => item.eventDate).sort();
-      const cover = list[0]?.photos[0];
-      return {
-        id: key,
-        title: labels[key as ChapterId] ?? key,
-        count: list.length,
-        oneLine: list[0]?.oneLine || list[0]?.title || "",
-        dateRange:
-          dates.length === 0
-            ? ""
-            : dates[0] === dates[dates.length - 1]
-              ? dates[0]
-              : `${dates[0]} — ${dates[dates.length - 1]}`,
-        coverUrl: cover?.thumbnailUrl ?? null,
-        coverGradient: cover?.gradient ?? gradientForIndex(index),
-      };
-    });
+  const orderedKeys = CHAPTER_IDS.filter((key) => (groups.get(key)?.length ?? 0) > 0);
+  const coverEventIds = orderedKeys
+    .map((key) => groups.get(key)?.[0]?.id)
+    .filter((id): id is string => Boolean(id));
+
+  const coverLinkByEvent = new Map<string, PhotoLinkRow>();
+  if (coverEventIds.length > 0) {
+    const { data: links, error: linksError } = await supabase
+      .from("event_photos")
+      .select(
+        "event_id, photo_id, role, sort_order, photos(id, original_filename, thumbnail_path, drive_file_id, width, height)",
+      )
+      .in("event_id", coverEventIds)
+      .order("sort_order", { ascending: true });
+
+    if (linksError) throw new Error(linksError.message);
+
+    const linksByEvent = groupLinksByEvent((links ?? []) as PhotoLinkRow[]);
+    for (const eventId of coverEventIds) {
+      const cover = pickCoverLink(linksByEvent.get(eventId) ?? []);
+      if (cover) coverLinkByEvent.set(eventId, cover);
+    }
+  }
+
+  const pathsToSign = [...coverLinkByEvent.values()]
+    .map((link) => {
+      const photo = Array.isArray(link.photos) ? link.photos[0] : link.photos;
+      return photo?.thumbnail_path ?? null;
+    })
+    .filter((path): path is string => Boolean(path));
+
+  const signedByPath = await signThumbnailsBatch(supabase, pathsToSign);
+
+  return orderedKeys.map((key, index) => {
+    const list = groups.get(key) ?? [];
+    const dates = list.map((item) => item.event_date).sort();
+    const first = list[0];
+    const coverLink = first ? coverLinkByEvent.get(first.id) : undefined;
+    const coverPhoto = coverLink
+      ? Array.isArray(coverLink.photos)
+        ? coverLink.photos[0]
+        : coverLink.photos
+      : null;
+    const coverUrl = coverPhoto?.thumbnail_path
+      ? (signedByPath.get(coverPhoto.thumbnail_path) ?? null)
+      : null;
+
+    return {
+      id: key,
+      title: labels[key as ChapterId] ?? key,
+      count: list.length,
+      oneLine: first?.one_line || first?.title || "",
+      dateRange:
+        dates.length === 0
+          ? ""
+          : dates[0] === dates[dates.length - 1]
+            ? dates[0]
+            : `${dates[0]} — ${dates[dates.length - 1]}`,
+      coverUrl,
+      coverGradient: gradientForIndex(index),
+    };
+  });
+}
+
+export async function getStoryChapters(): Promise<StoryChapter[]> {
+  if (!isSupabaseConfigured()) return [];
+
+  const ownerId = tryGetSiteOwnerId();
+  if (!ownerId) return [];
+
+  return unstable_cache(
+    () => fetchStoryChaptersForOwner(ownerId),
+    ["story-chapters", ownerId],
+    {
+      revalidate: PUBLISHED_CACHE_REVALIDATE_SECONDS,
+      tags: [PUBLISHED_CACHE_TAG],
+    },
+  )();
 }
 
 function isChapterKey(value: string, labels: Record<string, string>) {

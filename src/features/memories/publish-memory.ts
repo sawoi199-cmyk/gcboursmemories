@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { revalidatePublishedArchive } from "@/features/memories/published";
 import { createServiceClient } from "@/lib/supabase/admin";
 import { slugifyTitle } from "@/lib/utils/slug";
 
@@ -68,6 +69,7 @@ export async function publishMemoryEvent(input: {
 
   if (updateError) throw new Error(updateError.message);
 
+  revalidatePublishedArchive();
   return { ok: true as const, slug, status: "published" as const };
 }
 
@@ -84,5 +86,6 @@ export async function unpublishMemoryEvent(input: { ownerId: string; memoryId: s
     .eq("owner_id", input.ownerId);
 
   if (error) throw new Error(error.message);
+  revalidatePublishedArchive();
   return { ok: true as const, status: "draft" as const };
 }

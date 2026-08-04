@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { CHAPTER_IDS, resolveChapterLabels, type ChapterId } from "@/config/chapters";
+import { revalidatePublishedArchive } from "@/features/memories/published";
 import { requireSiteSession } from "@/lib/security/require-site-session";
 import { createServiceClient } from "@/lib/supabase/admin";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
@@ -90,6 +91,7 @@ export async function POST(request: Request) {
       }
     }
 
+    revalidatePublishedArchive();
     return NextResponse.json({ ok: true, labels });
   } catch (error) {
     return NextResponse.json(

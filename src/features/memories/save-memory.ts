@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { CHAPTER_IDS } from "@/config/chapters";
+import { revalidatePublishedArchive } from "@/features/memories/published";
 import { createServiceClient } from "@/lib/supabase/admin";
 
 export const SaveMemorySchema = z.object({
@@ -84,5 +85,7 @@ export async function saveMemoryEvent(input: {
     }
   }
 
+  // Published edits should refresh timeline / story / detail without waiting for TTL.
+  revalidatePublishedArchive();
   return { ok: true as const, savedAt: new Date().toISOString() };
 }

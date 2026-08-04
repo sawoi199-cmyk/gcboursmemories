@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   daysTogetherFromStartDate,
   neighborsFromOrderedList,
+  pickCoverLink,
 } from "@/features/memories/published";
 
 describe("daysTogetherFromStartDate", () => {
@@ -39,5 +40,47 @@ describe("neighborsFromOrderedList", () => {
 
   it("returns -1 when slug is missing", () => {
     expect(neighborsFromOrderedList(items, "missing").index).toBe(-1);
+  });
+});
+
+describe("pickCoverLink", () => {
+  it("prefers role=cover over first sort order", () => {
+    const links = [
+      {
+        photo_id: "1",
+        role: "detail",
+        sort_order: 0,
+        photos: null,
+      },
+      {
+        photo_id: "2",
+        role: "cover",
+        sort_order: 1,
+        photos: null,
+      },
+    ];
+    expect(pickCoverLink(links)?.photo_id).toBe("2");
+  });
+
+  it("falls back to the first link when no cover role", () => {
+    const links = [
+      {
+        photo_id: "1",
+        role: "detail",
+        sort_order: 0,
+        photos: null,
+      },
+      {
+        photo_id: "2",
+        role: "hero",
+        sort_order: 1,
+        photos: null,
+      },
+    ];
+    expect(pickCoverLink(links)?.photo_id).toBe("1");
+  });
+
+  it("returns null for empty list", () => {
+    expect(pickCoverLink([])).toBeNull();
   });
 });
