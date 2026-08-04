@@ -1,4 +1,8 @@
 import { randomUUID } from "node:crypto";
+import {
+  revalidatePublishedArchive,
+  revalidateStudioMemoryLists,
+} from "@/features/memories/published";
 import { buildDraftSlug } from "@/lib/utils/slug";
 import { createServiceClient } from "@/lib/supabase/admin";
 
@@ -69,6 +73,7 @@ export async function mergeMemoryEvents(input: {
     .eq("owner_id", input.ownerId);
   if (deleteEventError) throw new Error(deleteEventError.message);
 
+  revalidatePublishedArchive();
   return { ok: true as const, targetId: input.targetId };
 }
 
@@ -171,5 +176,6 @@ export async function splitMemoryEvent(input: {
     .eq("id", input.memoryId)
     .eq("owner_id", input.ownerId);
 
+  revalidateStudioMemoryLists();
   return { ok: true as const, newEventId, slug };
 }

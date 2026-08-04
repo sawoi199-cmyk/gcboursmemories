@@ -78,11 +78,12 @@ Consequences:
 Date: 2026-08-04
 Status: Accepted
 Context: Phase 5 需要可切换的日记生成能力，且无 API Key 时系统仍可用。
-Decision: 统一 `AIProvider.analyzeMemory`；默认 Mock；有 Key 时用 OpenAI-compatible Chat Completions（JSON + 一次 schema 修复）。生成结果写入 `diary_versions`（source=ai）并更新 draft 字段，不自动发布。分析图仅用缩略图再压缩，不送原图。对 Groq 关闭 `response_format` JSON 模式并设 `reasoning_effort=none`，避免 Qwen thinking 污染输出。
+Decision: 统一 `AIProvider.analyzeMemory`；默认 Mock；有 Key 时用 OpenAI-compatible Chat Completions（JSON + 一次 schema 修复）。生成结果写入 `diary_versions`（source=ai）并更新 draft 字段，不自动发布。分析图仅用缩略图再压缩，不送原图。对 Groq 关闭 `response_format` JSON 模式；仅对支持推理控制的模型（Qwen / GPT-OSS / Compound）设 `reasoning_effort=none`，避免 thinking 污染输出；Llama 等不支持该参数的模型不发送。
 Reason: 符合 SPEC 的事实约束与可替换 Provider；保护隐私与稳定性。
 Consequences:
 - 编辑器可展示 `questionsToConfirm` / `inferredFacts` / 版本恢复。
 - 真实多模态依赖模型是否支持 image_url；默认 `AI_VISION=false`。
+- Groq 推荐日记模型：`llama-3.3-70b-versatile`（无 reasoning 参数）；Qwen/GPT-OSS 才带 reasoning 控制。
 
 ## Decision 008
 
@@ -151,3 +152,4 @@ Reason: 私密站不宜公开 CDN 长缓存；短服务端 Data Cache + 按需�
 Consequences:
 - 发布后前台最多延迟至下次失效（立即 revalidate）；缓存内 signed URL 仍在 1h TTL 内。
 - 时间线 payload 仅含封面图，详情仍按 slug 加载全部照片。
+- 2026-08-04 补丁：`revalidatePublishedArchive` 同时 `revalidatePath` Studio 列表；`/studio` 与 `/studio/drafts` 设 `force-dynamic`，避免后台仍显示发布前的旧列表。

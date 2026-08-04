@@ -6,6 +6,9 @@ import { createServiceClient } from "@/lib/supabase/admin";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { cn } from "@/lib/utils";
 
+/** Always read live Studio lists; do not serve a stale prerender after publish. */
+export const dynamic = "force-dynamic";
+
 type OverviewMemory = {
   id: string;
   title: string;

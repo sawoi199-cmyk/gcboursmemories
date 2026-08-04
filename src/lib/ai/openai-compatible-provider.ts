@@ -31,6 +31,11 @@ function isGroqBaseUrl(baseUrl: string) {
   return /groq\.com/i.test(baseUrl);
 }
 
+/** Qwen / GPT-OSS on Groq accept reasoning_* params; Llama rejects them with 400. */
+function supportsGroqReasoningControls(model: string) {
+  return /qwen|gpt-oss|compound/i.test(model);
+}
+
 type CompleteOptions = {
   imageDataUrls?: string[];
   /** OpenAI-style JSON object mode. Groq often rejects imperfect model output with 400. */
@@ -121,8 +126,12 @@ Return corrected JSON only — one object, no markdown.`;
     if (options.jsonMode) {
       body.response_format = { type: "json_object" };
     }
-    // Qwen-on-Groq dumps <think> into content and breaks JSON mode unless reasoning is off/hidden.
-    if (isGroqBaseUrl(this.options.baseUrl)) {
+    // Qwen/GPT-OSS on Groq dump <think> into content unless reasoning is off/hidden.
+    // Llama (e.g. llama-3.3-70b-versatile) rejects these params with 400.
+    if (
+      isGroqBaseUrl(this.options.baseUrl) &&
+      supportsGroqReasoningControls(this.options.model)
+    ) {
       body.reasoning_effort = "none";
       body.reasoning_format = "hidden";
     }

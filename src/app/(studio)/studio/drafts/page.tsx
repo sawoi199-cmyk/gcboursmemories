@@ -4,6 +4,9 @@ import { getSiteOwnerId } from "@/lib/config/site-owner";
 import { createServiceClient } from "@/lib/supabase/admin";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 
+/** Always read live Studio lists; do not serve a stale prerender after publish. */
+export const dynamic = "force-dynamic";
+
 type MemoryRow = {
   id: string;
   title: string;

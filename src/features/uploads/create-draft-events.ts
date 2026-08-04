@@ -3,6 +3,7 @@ import {
   groupPhotos,
   type PhotoGroupCandidate,
 } from "@/features/event-grouping/group-photos";
+import { revalidateStudioMemoryLists } from "@/features/memories/published";
 import { buildDraftSlug } from "@/lib/utils/slug";
 import { createServiceClient } from "@/lib/supabase/admin";
 
@@ -40,6 +41,7 @@ export async function createDraftEventsFromPhotos(input: {
     created.push(event);
   }
 
+  revalidateStudioMemoryLists();
   return created;
 }
 

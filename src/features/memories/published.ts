@@ -1,4 +1,4 @@
-import { unstable_cache, revalidateTag } from "next/cache";
+import { unstable_cache, revalidatePath, revalidateTag } from "next/cache";
 import { appConfig } from "@/config/app";
 import {
   CHAPTER_IDS,
@@ -255,9 +255,17 @@ export function neighborsFromOrderedList<T extends { slug: string }>(
   };
 }
 
+/** Invalidate Studio list pages so drafts/published counts match the DB. */
+export function revalidateStudioMemoryLists() {
+  revalidatePath("/studio");
+  revalidatePath("/studio/drafts");
+}
+
 /** Invalidate timeline / story / home / detail published caches immediately. */
 export function revalidatePublishedArchive() {
   revalidateTag(PUBLISHED_CACHE_TAG, { expire: 0 });
+  // Publish/save also changes what Studio lists should show.
+  revalidateStudioMemoryLists();
 }
 
 async function fetchHomeStatsForOwner(ownerId: string): Promise<HomeStats> {

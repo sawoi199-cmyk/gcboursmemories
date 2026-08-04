@@ -28,6 +28,7 @@ Phase 8 — 测试与部署（已落地骨架；生产部署需你在 Vercel/Sup
 
 ## Notes
 
+- Bugfix：后台「回忆」列表未随发布/上传失效，前台 3 条后台只显示 2 条；已对 Studio 列表 `force-dynamic` + `revalidatePath`
 - 仓库：https://github.com/asushi199/gcbours
 - 背景音乐仍延后
 - Bugfix：`/studio/templates` 版式卡片原先是静态 `<li>`，点击无反应；现改为可点选并切换下方预览
