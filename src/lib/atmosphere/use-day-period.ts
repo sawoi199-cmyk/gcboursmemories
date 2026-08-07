@@ -9,11 +9,21 @@ export function useDayPeriod(pollMs = 60_000): DayPeriod | null {
 
   useEffect(() => {
     function sync() {
-      setPeriod(getDayPeriod(new Date()));
+      const next = getDayPeriod(new Date());
+      setPeriod((current) => (current === next ? current : next));
     }
+
     sync();
     const timer = window.setInterval(sync, pollMs);
-    return () => window.clearInterval(timer);
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") sync();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
   }, [pollMs]);
 
   return period;

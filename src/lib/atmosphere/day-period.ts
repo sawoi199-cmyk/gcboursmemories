@@ -39,6 +39,18 @@ export function getBackgroundsForPeriod(
   return PERIOD_BACKGROUNDS[period];
 }
 
+/** Period-tinted gradients shown under photos while they load / crossfade. */
+export const PERIOD_HERO_FALLBACK: Record<DayPeriod, string> = {
+  morning:
+    "linear-gradient(165deg, #2a221c 0%, #5a4636 32%, #c4a07a 68%, #f3e6d4 100%)",
+  noon:
+    "linear-gradient(165deg, #1c2430 0%, #3d4a5c 34%, #8fa6b8 70%, #e8eef2 100%)",
+  dusk:
+    "linear-gradient(165deg, #1a1418 0%, #4a3038 30%, #b46a6a 65%, #f0e0d4 100%)",
+  night:
+    "linear-gradient(165deg, #111216 0%, #1b1d22 35%, #3a2e2a 70%, #f6f1ea 100%)",
+};
+
 /** Soft paper tints for reading pages — echoes home photos without covering content. */
 export type PeriodPageTheme = {
   page: string;

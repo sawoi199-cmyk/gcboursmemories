@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   getBackgroundsForPeriod,
   getDayPeriod,
+  PERIOD_HERO_FALLBACK,
   PERIOD_PAGE_THEME,
 } from "@/lib/atmosphere/day-period";
 
@@ -32,6 +33,14 @@ describe("PERIOD_PAGE_THEME", () => {
     for (const period of ["morning", "noon", "dusk", "night"] as const) {
       expect(PERIOD_PAGE_THEME[period].page).toMatch(/^#/);
       expect(PERIOD_PAGE_THEME[period].nav).toContain("rgba");
+    }
+  });
+});
+
+describe("PERIOD_HERO_FALLBACK", () => {
+  it("provides a gradient fallback for every period", () => {
+    for (const period of ["morning", "noon", "dusk", "night"] as const) {
+      expect(PERIOD_HERO_FALLBACK[period]).toContain("linear-gradient");
     }
   });
 });
