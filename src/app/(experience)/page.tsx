@@ -1,9 +1,7 @@
-import Link from "next/link";
 import { AtmosphereBackground } from "@/components/experience/atmosphere-background";
+import { HomeEntries } from "@/components/experience/home-entries";
 import { FadeIn } from "@/components/motion/fade-in";
-import { buttonVariants } from "@/components/ui/button";
 import { getHomeStats } from "@/features/memories/published";
-import { cn } from "@/lib/utils";
 
 /** Always read live stats (days together, counts) — do not bake "—" at build time. */
 export const dynamic = "force-dynamic";
@@ -26,33 +24,19 @@ export default async function HomePage() {
           </p>
         </FadeIn>
 
-        <FadeIn delay={0.12} className="mt-10 grid gap-4 sm:grid-cols-2">
+        <FadeIn delay={0.12} className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
           <Stat
-            label="我们一起的第"
+            label="一起的第"
             value={stats.daysTogether == null ? "—" : `${stats.daysTogether}`}
             suffix="天"
           />
-          <Stat label="共同记录的" value={`${stats.memoryCount}`} suffix="个回忆" />
-          <Stat label="去过的" value={`${stats.placeCount}`} suffix="个地方" />
-          <Stat label="收藏的" value={`${stats.photoCount}`} suffix="张照片" />
+          <Stat label="回忆" value={`${stats.memoryCount}`} suffix="个" />
+          <Stat label="地方" value={`${stats.placeCount}`} suffix="处" />
+          <Stat label="照片" value={`${stats.photoCount}`} suffix="张" />
         </FadeIn>
 
-        <FadeIn delay={0.2} className="mt-10 flex flex-wrap gap-3">
-          <Link
-            href="/story"
-            className={cn(buttonVariants({ size: "lg" }), "bg-paper text-ink hover:bg-paper/90")}
-          >
-            打开我们的故事
-          </Link>
-          <Link
-            href="/timeline"
-            className={cn(
-              buttonVariants({ variant: "outline", size: "lg" }),
-              "border-paper/30 bg-transparent text-paper hover:bg-paper/10 hover:text-paper",
-            )}
-          >
-            时间线
-          </Link>
+        <FadeIn delay={0.2} className="mt-8">
+          <HomeEntries />
         </FadeIn>
       </div>
     </section>
@@ -69,11 +53,11 @@ function Stat({
   suffix: string;
 }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-night/30 px-4 py-3 backdrop-blur-sm">
-      <p className="text-xs text-paper/55">{label}</p>
-      <p className="mt-1 font-serif text-3xl text-paper">
+    <div className="rounded-xl border border-white/10 bg-night/25 px-3 py-2.5 backdrop-blur-sm">
+      <p className="text-[11px] text-paper/50">{label}</p>
+      <p className="mt-0.5 font-serif text-2xl text-paper">
         {value}
-        <span className="ml-1 text-base text-paper/60">{suffix}</span>
+        <span className="ml-0.5 text-sm text-paper/55">{suffix}</span>
       </p>
     </div>
   );
