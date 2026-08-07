@@ -1,11 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import {
-  getDayPeriod,
   PERIOD_BACKGROUNDS,
-  type DayPeriod,
 } from "@/lib/atmosphere/day-period";
+import { useDayPeriod } from "@/lib/atmosphere/use-day-period";
 import { cn } from "@/lib/utils";
 
 type AtmosphereBackgroundProps = {
@@ -18,17 +16,7 @@ export function AtmosphereBackground({
   className,
   intensity = "default",
 }: AtmosphereBackgroundProps) {
-  const [period, setPeriod] = useState<DayPeriod | null>(null);
-
-  useEffect(() => {
-    function sync() {
-      setPeriod(getDayPeriod(new Date()));
-    }
-    sync();
-    const timer = window.setInterval(sync, 60_000);
-    return () => window.clearInterval(timer);
-  }, []);
-
+  const period = useDayPeriod();
   const backgrounds = period ? PERIOD_BACKGROUNDS[period] : null;
 
   return (

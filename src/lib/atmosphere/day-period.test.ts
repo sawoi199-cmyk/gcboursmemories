@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { getBackgroundsForPeriod, getDayPeriod } from "@/lib/atmosphere/day-period";
+import {
+  getBackgroundsForPeriod,
+  getDayPeriod,
+  PERIOD_PAGE_THEME,
+} from "@/lib/atmosphere/day-period";
 
 describe("getDayPeriod", () => {
   it("maps local hours to atmosphere periods", () => {
@@ -20,5 +24,14 @@ describe("getBackgroundsForPeriod", () => {
       desktop: "/backgrounds/dusk-desktop.webp",
       mobile: "/backgrounds/dusk-mobile.webp",
     });
+  });
+});
+
+describe("PERIOD_PAGE_THEME", () => {
+  it("defines readable paper tints for every period", () => {
+    for (const period of ["morning", "noon", "dusk", "night"] as const) {
+      expect(PERIOD_PAGE_THEME[period].page).toMatch(/^#/);
+      expect(PERIOD_PAGE_THEME[period].nav).toContain("rgba");
+    }
   });
 });
