@@ -4,6 +4,10 @@ import Link from "next/link";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { FadeIn } from "@/components/motion/fade-in";
 import { buttonVariants } from "@/components/ui/button";
+import {
+  appendExifToFormData,
+  prepareFileForUpload,
+} from "@/lib/image/compress-for-upload";
 import { cn } from "@/lib/utils";
 
 const steps = [
@@ -12,6 +16,31 @@ const steps = [
 ] as const;
 
 const CONCURRENCY = 3;
+
+async function readUploadResponse(response: Response) {
+  const text = await response.text();
+  try {
+    return JSON.parse(text) as {
+      ok: boolean;
+      message?: string;
+      photo?: {
+        id: string;
+        takenAt: string | null;
+        takenAtSource: string;
+        needsDateConfirm: boolean;
+      };
+    };
+  } catch {
+    if (
+      response.status === 413 ||
+      /Request Entity Too Large/i.test(text) ||
+      text.trimStart().startsWith("Request En")
+    ) {
+      throw new Error("文件过大（服务器限制），请稍后重试或换更小的图。");
+    }
+    throw new Error(`Upload failed (${response.status || "network"})`);
+  }
+}
 
 type UploadItem = {
   localId: string;
@@ -131,28 +160,34 @@ export function UploadWizard() {
       setItems((current) =>
         current.map((row) =>
           row.localId === item.localId
-            ? { ...row, status: "uploading", progress: 20, error: undefined }
+            ? { ...row, status: "uploading", progress: 15, error: undefined }
             : row,
         ),
       );
 
       try {
+        const prepared = await prepareFileForUpload(item.file);
+        setItems((current) =>
+          current.map((row) =>
+            row.localId === item.localId
+              ? {
+                  ...row,
+                  progress: 45,
+                  file: prepared.compressed ? prepared.file : row.file,
+                }
+              : row,
+          ),
+        );
+
         const body = new FormData();
-        body.append("file", item.file);
+        body.append("file", prepared.file);
+        appendExifToFormData(body, prepared.exif);
+
         const response = await fetch("/api/uploads", {
           method: "POST",
           body,
         });
-        const json = (await response.json()) as {
-          ok: boolean;
-          message?: string;
-          photo?: {
-            id: string;
-            takenAt: string | null;
-            takenAtSource: string;
-            needsDateConfirm: boolean;
-          };
-        };
+        const json = await readUploadResponse(response);
 
         if (!response.ok || !json.ok || !json.photo) {
           throw new Error(json.message ?? "Upload failed");
@@ -323,7 +358,7 @@ export function UploadWizard() {
               }}
               className="rounded-xl border border-dashed border-line px-6 py-12 text-center text-sm text-muted-ours"
             >
-              拖放或点击选择照片（并发 {CONCURRENCY}）
+              拖放或点击选择照片（上传前自动压缩 · 并发 {CONCURRENCY}）
             </div>
 
             <ul className="space-y-3">

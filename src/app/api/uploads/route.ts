@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { uploadPhotoForOwner } from "@/features/uploads/upload-photo";
 import { isDriveConfigured } from "@/lib/google-drive/gas-client";
+import { parseUploadExifFromForm } from "@/lib/image/compress-for-upload";
 import { requireSiteSession } from "@/lib/security/require-site-session";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 
@@ -35,7 +36,11 @@ export async function POST(request: Request) {
       );
     }
 
-    const photo = await uploadPhotoForOwner({ ownerId: session.ownerId, file });
+    const photo = await uploadPhotoForOwner({
+      ownerId: session.ownerId,
+      file,
+      clientExif: parseUploadExifFromForm(form),
+    });
     return NextResponse.json({ ok: true, photo });
   } catch (error) {
     return NextResponse.json(

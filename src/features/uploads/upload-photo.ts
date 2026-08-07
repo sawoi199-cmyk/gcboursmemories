@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { isDriveConfigured, uploadDriveFile } from "@/lib/google-drive/gas-client";
-import { parseImageExif } from "@/lib/exif/parse-exif";
+import { parseImageExif, type ParsedExif } from "@/lib/exif/parse-exif";
+import type { UploadExifMeta } from "@/lib/image/compress-for-upload";
 import {
   createJpegThumbnail,
   isAcceptedImageMime,
@@ -8,6 +9,32 @@ import {
 } from "@/lib/image/thumbnail";
 import { createServiceClient } from "@/lib/supabase/admin";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
+
+function mergeClientExif(
+  fromFile: ParsedExif,
+  client: UploadExifMeta | null | undefined,
+): ParsedExif {
+  if (!client) return fromFile;
+
+  const clientTakenAt =
+    client.takenAt && !Number.isNaN(Date.parse(client.takenAt))
+      ? new Date(client.takenAt)
+      : null;
+
+  // Prefer client EXIF when present — canvas re-encode strips tags from the file.
+  return {
+    takenAt: clientTakenAt ?? fromFile.takenAt,
+    takenAtSource: clientTakenAt
+      ? client.takenAtSource
+      : fromFile.takenAtSource,
+    latitude: client.latitude ?? fromFile.latitude,
+    longitude: client.longitude ?? fromFile.longitude,
+    orientation: client.orientation ?? fromFile.orientation,
+    cameraModel: client.cameraModel ?? fromFile.cameraModel,
+    width: client.width ?? fromFile.width,
+    height: client.height ?? fromFile.height,
+  };
+}
 
 export type UploadedPhotoResult = {
   id: string;
@@ -39,6 +66,7 @@ function extensionForMime(mimeType: string, filename: string) {
 export async function uploadPhotoForOwner(input: {
   ownerId: string;
   file: File;
+  clientExif?: UploadExifMeta | null;
 }) {
   if (!isSupabaseConfigured()) {
     throw new Error("Supabase is not configured.");
@@ -61,7 +89,10 @@ export async function uploadPhotoForOwner(input: {
     ? new Date(input.file.lastModified)
     : null;
 
-  const exif = await parseImageExif(buffer, fileMtime);
+  const exif = mergeClientExif(
+    await parseImageExif(buffer, fileMtime),
+    input.clientExif,
+  );
   const thumbnail = await createJpegThumbnail({ buffer, mimeType });
 
   const ext = extensionForMime(mimeType, input.file.name);
