@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AtmosphereBackground } from "@/components/experience/atmosphere-background";
 import { FadeIn } from "@/components/motion/fade-in";
 import { buttonVariants } from "@/components/ui/button";
 import { getHomeStats } from "@/features/memories/published";
@@ -11,16 +12,8 @@ export default async function HomePage() {
   const stats = await getHomeStats();
 
   return (
-    <section className="relative flex min-h-[calc(100vh-3.5rem)] flex-1 flex-col overflow-hidden">
-      <div
-        aria-hidden
-        className="absolute inset-0"
-        style={{
-          backgroundImage:
-            "linear-gradient(165deg, #111216 0%, #1b1d22 35%, #3a2e2a 70%, #f6f1ea 100%)",
-        }}
-      />
-      <div aria-hidden className="absolute inset-0 bg-[radial-gradient(circle_at_70%_30%,rgba(198,161,91,0.18),transparent_45%)]" />
+    <section className="relative flex min-h-[calc(100vh-3.5rem)] flex-1 flex-col overflow-hidden bg-night">
+      <AtmosphereBackground />
 
       <div className="relative z-10 mx-auto flex w-full max-w-3xl flex-1 flex-col justify-end px-6 pb-16 pt-24 md:justify-center md:pb-24">
         <FadeIn>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { AtmosphereBackground } from "@/components/experience/atmosphere-background";
 import { FadeIn } from "@/components/motion/fade-in";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -53,15 +54,7 @@ export function UnlockScreen() {
 
   return (
     <section className="relative flex min-h-[calc(100vh-3.5rem)] flex-1 flex-col items-center justify-center overflow-hidden bg-night px-6 py-16 text-center text-paper">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 opacity-[0.07]"
-        style={{
-          backgroundImage:
-            "repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.35) 3px)",
-        }}
-      />
-      <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(198,161,91,0.12),transparent_55%)]" />
+      <AtmosphereBackground intensity="strong" />
 
       {status === "success" ? (
         <FadeIn className="relative z-10 space-y-4">
