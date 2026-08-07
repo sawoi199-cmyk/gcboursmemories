@@ -34,9 +34,6 @@ export default async function MemoryPage({ params }: MemoryPageProps) {
           {date.year}.{date.short}
           {memory.placeName ? ` · ${memory.placeName}` : ""}
         </p>
-        {memory.subtitle ? (
-          <p className="mt-3 text-sm text-muted-ours">{memory.subtitle}</p>
-        ) : null}
       </FadeIn>
 
       <FadeIn delay={0.08} className="mt-8">
