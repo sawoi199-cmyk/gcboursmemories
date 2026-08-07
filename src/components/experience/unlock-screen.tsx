@@ -1,13 +1,11 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { FadeIn } from "@/components/motion/fade-in";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 export function UnlockScreen() {
-  const router = useRouter();
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [ownerName, setOwnerName] = useState("臭宝");
@@ -40,9 +38,10 @@ export function UnlockScreen() {
       setOwnerName(json.ownerName ?? "臭宝");
       setPartnerName(json.partnerName ?? "乖宝");
       setStatus("success");
+      // Hard navigate so the new session cookie is included in the next document
+      // request. Soft client navigation can leave users stuck on this success UI.
       window.setTimeout(() => {
-        router.push("/");
-        router.refresh();
+        window.location.assign("/");
       }, 450);
     } catch {
       setStatus("error");

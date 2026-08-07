@@ -35,7 +35,7 @@ export default async function HomePage() {
 
         <FadeIn delay={0.12} className="mt-10 grid gap-4 sm:grid-cols-2">
           <Stat
-            label="我们认识后的第"
+            label="我们一起的第"
             value={stats.daysTogether == null ? "—" : `${stats.daysTogether}`}
             suffix="天"
           />
