@@ -42,6 +42,7 @@ export function UnlockScreen() {
       // Hard navigate so the new session cookie is included in the next document
       // request. Soft client navigation can leave users stuck on this success UI.
       window.setTimeout(() => {
+        // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- need full reload for session cookie
         window.location.assign("/");
       }, 450);
     } catch {

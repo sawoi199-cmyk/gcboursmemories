@@ -28,7 +28,9 @@ export function InfiniteScrollSentinel({
   const onLoadMoreRef = useRef(onLoadMore);
   const lockRef = useRef(false);
 
-  onLoadMoreRef.current = onLoadMore;
+  useEffect(() => {
+    onLoadMoreRef.current = onLoadMore;
+  }, [onLoadMore]);
 
   useEffect(() => {
     if (!loading) {
