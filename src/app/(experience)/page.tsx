@@ -13,7 +13,7 @@ export default async function HomePage() {
     <section className="relative flex min-h-[calc(100vh-3.5rem)] flex-1 flex-col overflow-hidden bg-night">
       <AtmosphereBackground />
 
-      <div className="relative z-10 mx-auto flex w-full max-w-3xl flex-1 flex-col justify-end px-6 pb-16 pt-24 md:justify-center md:pb-24">
+      <div className="relative z-10 mx-auto flex w-full max-w-3xl flex-1 flex-col justify-center px-6 py-12 md:py-24">
         <FadeIn>
           <p className="text-xs tracking-[0.28em] text-gold uppercase">OURS</p>
           <h1 className="mt-5 max-w-xl font-serif text-4xl leading-[1.15] text-paper md:text-5xl">
