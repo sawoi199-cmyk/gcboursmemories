@@ -3,6 +3,7 @@ import {
   daysTogetherFromStartDate,
   neighborsFromOrderedList,
   pickCoverLink,
+  chapterCursorOrFilter,
   timelineCursorOrFilter,
 } from "@/features/memories/published";
 
@@ -95,6 +96,19 @@ describe("timelineCursorOrFilter", () => {
       }),
     ).toBe(
       "event_date.lt.2025-06-08,and(event_date.eq.2025-06-08,id.lt.00000000-0000-4000-8000-000000000002)",
+    );
+  });
+});
+
+describe("chapterCursorOrFilter", () => {
+  it("builds an ascending composite cursor filter", () => {
+    expect(
+      chapterCursorOrFilter({
+        eventDate: "2025-06-08",
+        id: "00000000-0000-4000-8000-000000000002",
+      }),
+    ).toBe(
+      "event_date.gt.2025-06-08,and(event_date.eq.2025-06-08,id.gt.00000000-0000-4000-8000-000000000002)",
     );
   });
 });

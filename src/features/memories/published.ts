@@ -349,6 +349,9 @@ export async function getHomeStats(): Promise<HomeStats> {
 /** Newest-first page size for timeline “加载更多”. */
 export const TIMELINE_PAGE_SIZE = 20;
 
+/** Oldest-first page size for chapter reading. */
+export const CHAPTER_PAGE_SIZE = 20;
+
 export type TimelineCursor = {
   eventDate: string;
   id: string;
@@ -366,6 +369,14 @@ export type TimelinePageResult = {
   nextCursor: TimelineCursor | null;
 };
 
+export type ChapterMeta = {
+  title: string;
+  count: number;
+  dateRange: string;
+};
+
+export type ChapterPageResult = TimelinePageResult;
+
 export type CalendarDayCount = {
   date: string;
   count: number;
@@ -374,6 +385,29 @@ export type CalendarDayCount = {
 /** PostgREST filter: newer pages when ordered by event_date desc, id desc. */
 export function timelineCursorOrFilter(cursor: TimelineCursor): string {
   return `event_date.lt.${cursor.eventDate},and(event_date.eq.${cursor.eventDate},id.lt.${cursor.id})`;
+}
+
+/** PostgREST filter: later pages when ordered by event_date asc, id asc. */
+export function chapterCursorOrFilter(cursor: TimelineCursor): string {
+  return `event_date.gt.${cursor.eventDate},and(event_date.eq.${cursor.eventDate},id.gt.${cursor.id})`;
+}
+
+/**
+ * Match story list grouping: null / unknown chapter ids → ordinary_days.
+ * Valid chapter ids other than ordinary_days are exact matches.
+ */
+function applyStoryChapterFilter<
+  Q extends {
+    eq: (column: string, value: string) => Q;
+    or: (filters: string) => Q;
+  },
+>(query: Q, chapterId: ChapterId): Q {
+  if (chapterId !== "ordinary_days") {
+    return query.eq("chapter", chapterId);
+  }
+  return query.or(
+    `chapter.eq.ordinary_days,chapter.is.null,chapter.not.in.(${CHAPTER_IDS.join(",")})`,
+  );
 }
 
 async function hydrateEventsWithCovers(
@@ -520,6 +554,179 @@ export async function getPublishedTimelinePage(input: {
 
   // Paginated pages are not Data-Cached (cursor cardinality); covers stay cheap via batch sign.
   return fetchPublishedTimelinePageForOwner(ownerId, filters, cursor, limit);
+}
+
+async function fetchPublishedChapterMetaForOwner(
+  ownerId: string,
+  chapterId: ChapterId,
+): Promise<ChapterMeta> {
+  const supabase = createServiceClient();
+
+  let countQuery = supabase
+    .from("memory_events")
+    .select("id", { count: "exact", head: true })
+    .eq("owner_id", ownerId)
+    .eq("status", "published");
+  countQuery = applyStoryChapterFilter(countQuery, chapterId);
+
+  let firstQuery = supabase
+    .from("memory_events")
+    .select("event_date")
+    .eq("owner_id", ownerId)
+    .eq("status", "published");
+  firstQuery = applyStoryChapterFilter(firstQuery, chapterId);
+
+  let lastQuery = supabase
+    .from("memory_events")
+    .select("event_date")
+    .eq("owner_id", ownerId)
+    .eq("status", "published");
+  lastQuery = applyStoryChapterFilter(lastQuery, chapterId);
+
+  const [settingsResult, countResult, firstResult, lastResult] = await Promise.all([
+    supabase
+      .from("relationship_settings")
+      .select("chapter_labels")
+      .eq("owner_id", ownerId)
+      .maybeSingle(),
+    countQuery,
+    firstQuery.order("event_date", { ascending: true }).limit(1).maybeSingle(),
+    lastQuery.order("event_date", { ascending: false }).limit(1).maybeSingle(),
+  ]);
+
+  if (countResult.error) throw new Error(countResult.error.message);
+  if (firstResult.error) throw new Error(firstResult.error.message);
+  if (lastResult.error) throw new Error(lastResult.error.message);
+
+  const labels = resolveChapterLabels(
+    (settingsResult.data?.chapter_labels as Partial<
+      Record<ChapterId, string>
+    > | null) ?? null,
+  );
+
+  const count = countResult.count ?? 0;
+  const firstDate = firstResult.data?.event_date ?? null;
+  const lastDate = lastResult.data?.event_date ?? null;
+  const dateRange =
+    !firstDate || !lastDate
+      ? ""
+      : firstDate === lastDate
+        ? firstDate
+        : `${firstDate} — ${lastDate}`;
+
+  return {
+    title: labels[chapterId],
+    count,
+    dateRange,
+  };
+}
+
+async function fetchPublishedChapterPageForOwner(
+  ownerId: string,
+  chapterId: ChapterId,
+  cursor: TimelineCursor | null,
+  limit: number,
+): Promise<ChapterPageResult> {
+  const supabase = createServiceClient();
+
+  let query = supabase
+    .from("memory_events")
+    .select(
+      "id, slug, title, subtitle, one_line, event_date, place_name, template_id, status, mood, chapter, published_at",
+    )
+    .eq("owner_id", ownerId)
+    .eq("status", "published");
+
+  query = applyStoryChapterFilter(query, chapterId);
+
+  if (cursor) {
+    query = query.or(chapterCursorOrFilter(cursor));
+  }
+
+  const { data: events, error } = await query
+    .order("event_date", { ascending: true })
+    .order("id", { ascending: true })
+    .limit(limit + 1);
+
+  if (error) throw new Error(error.message);
+
+  const rows = (events ?? []).map((event) => ({
+    ...event,
+    diary_body: null,
+  })) as EventRow[];
+
+  const hasMore = rows.length > limit;
+  const pageRows = hasMore ? rows.slice(0, limit) : rows;
+  const memories = await hydrateEventsWithCovers(supabase, pageRows);
+  const last = pageRows[pageRows.length - 1];
+  const nextCursor =
+    hasMore && last
+      ? { eventDate: last.event_date, id: last.id }
+      : null;
+
+  return { memories, nextCursor };
+}
+
+export async function getPublishedChapterMeta(
+  chapterId: ChapterId,
+): Promise<ChapterMeta> {
+  if (!isSupabaseConfigured()) {
+    return { title: resolveChapterLabels()[chapterId], count: 0, dateRange: "" };
+  }
+
+  const ownerId = tryGetSiteOwnerId();
+  if (!ownerId) {
+    return { title: resolveChapterLabels()[chapterId], count: 0, dateRange: "" };
+  }
+
+  return unstable_cache(
+    () => fetchPublishedChapterMetaForOwner(ownerId, chapterId),
+    ["chapter-meta", ownerId, chapterId],
+    {
+      revalidate: PUBLISHED_CACHE_REVALIDATE_SECONDS,
+      tags: [PUBLISHED_CACHE_TAG],
+    },
+  )();
+}
+
+export async function getPublishedChapterPage(input: {
+  chapterId: ChapterId;
+  cursor?: TimelineCursor | null;
+  limit?: number;
+}): Promise<ChapterPageResult> {
+  if (!isSupabaseConfigured()) {
+    return { memories: [], nextCursor: null };
+  }
+
+  const ownerId = tryGetSiteOwnerId();
+  if (!ownerId) {
+    return { memories: [], nextCursor: null };
+  }
+
+  const cursor = input.cursor ?? null;
+  const limit = Math.min(
+    Math.max(input.limit ?? CHAPTER_PAGE_SIZE, 1),
+    50,
+  );
+
+  if (cursor) {
+    return fetchPublishedChapterPageForOwner(
+      ownerId,
+      input.chapterId,
+      cursor,
+      limit,
+    );
+  }
+
+  return unstable_cache(
+    () =>
+      fetchPublishedChapterPageForOwner(ownerId, input.chapterId, null, limit),
+    ["chapter-page", ownerId, input.chapterId, String(limit)],
+    {
+      revalidate: PUBLISHED_CACHE_REVALIDATE_SECONDS,
+      tags: [PUBLISHED_CACHE_TAG],
+    },
+  )();
 }
 
 async function fetchPublishedCalendarDaysForOwner(
