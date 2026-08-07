@@ -30,27 +30,37 @@ export default async function StoryPage() {
         <ol className="mt-10 space-y-8 sm:mt-12">
           {chapters.map((chapter, index) => (
             <FadeIn key={chapter.id} delay={0.05 * index}>
-              <li className="group grid gap-4 border-t border-line pt-6 sm:grid-cols-[140px_1fr] sm:items-center">
-                <div
-                  className="aspect-[4/3] overflow-hidden rounded-xl bg-cover bg-center shadow-[0_10px_30px_rgba(32,28,26,0.06)] sm:aspect-square"
-                  style={
-                    chapter.coverUrl
-                      ? { backgroundImage: `url(${chapter.coverUrl})` }
-                      : { backgroundImage: chapter.coverGradient }
-                  }
-                  aria-hidden
-                />
-                <div>
-                  <p className="text-xs tracking-[0.25em] text-gold">
-                    {String(index + 1).padStart(2, "0")}
-                  </p>
-                  <h2 className="mt-1 font-serif text-2xl text-ink md:text-3xl">{chapter.title}</h2>
-                  <p className="mt-2 text-sm leading-7 text-muted-ours">{chapter.oneLine}</p>
-                  <p className="mt-3 text-xs text-muted-ours">
-                    {chapter.count} 篇回忆
-                    {chapter.dateRange ? ` · ${chapter.dateRange}` : ""}
-                  </p>
-                </div>
+              <li className="border-t border-line pt-6">
+                <Link
+                  href={`/story/${chapter.id}`}
+                  className="group grid gap-4 rounded-xl outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring sm:grid-cols-[140px_1fr] sm:items-center"
+                >
+                  <div
+                    className="aspect-[4/3] overflow-hidden rounded-xl bg-cover bg-center shadow-[0_10px_30px_rgba(32,28,26,0.06)] transition-transform duration-200 group-hover:scale-[1.02] sm:aspect-square"
+                    style={
+                      chapter.coverUrl
+                        ? { backgroundImage: `url(${chapter.coverUrl})` }
+                        : { backgroundImage: chapter.coverGradient }
+                    }
+                    aria-hidden
+                  />
+                  <div>
+                    <p className="text-xs tracking-[0.25em] text-gold">
+                      {String(index + 1).padStart(2, "0")}
+                    </p>
+                    <h2 className="mt-1 font-serif text-2xl text-ink group-hover:text-accent-ours md:text-3xl">
+                      {chapter.title}
+                    </h2>
+                    <p className="mt-2 text-sm leading-7 text-muted-ours">{chapter.oneLine}</p>
+                    <p className="mt-3 text-xs text-muted-ours">
+                      {chapter.count} 篇回忆
+                      {chapter.dateRange ? ` · ${chapter.dateRange}` : ""}
+                      <span className="ml-2 text-accent-ours opacity-0 transition-opacity group-hover:opacity-100">
+                        阅读这一章 →
+                      </span>
+                    </p>
+                  </div>
+                </Link>
               </li>
             </FadeIn>
           ))}
