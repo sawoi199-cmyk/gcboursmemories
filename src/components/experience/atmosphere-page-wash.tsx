@@ -1,13 +1,19 @@
 import { cn } from "@/lib/utils";
 import type { PeriodPageTheme } from "@/lib/atmosphere/day-period";
 
-type ExperiencePageWashProps = {
+type AtmospherePageWashProps = {
   theme: PeriodPageTheme;
   className?: string;
+  /** Reading pages keep a faint ruled texture; Studio stays quieter. */
+  density?: "reading" | "work";
 };
 
-/** Soft timed wash for reading pages — pairs with home atmosphere without photo noise. */
-export function ExperiencePageWash({ theme, className }: ExperiencePageWashProps) {
+/** Soft timed wash — echoes home atmosphere without covering content. */
+export function AtmospherePageWash({
+  theme,
+  className,
+  density = "reading",
+}: AtmospherePageWashProps) {
   return (
     <div
       aria-hidden
@@ -18,23 +24,22 @@ export function ExperiencePageWash({ theme, className }: ExperiencePageWashProps
         style={{ backgroundColor: theme.page }}
       />
 
-      {/* Soft sky-side light — bridges from home photo mood */}
       <div
         className="absolute inset-x-0 top-0 h-56 transition-opacity duration-700"
         style={{
           backgroundImage: `radial-gradient(ellipse 90% 80% at 18% -10%, ${theme.washA}, transparent 60%), radial-gradient(ellipse 70% 70% at 92% 0%, ${theme.washB}, transparent 55%)`,
+          opacity: density === "work" ? 0.85 : 1,
         }}
       />
 
-      {/* Quiet bottom vignette so lists feel grounded */}
       <div
         className="absolute inset-x-0 bottom-0 h-48"
         style={{
           backgroundImage: `linear-gradient(to top, ${theme.rim}, transparent)`,
+          opacity: density === "work" ? 0.7 : 1,
         }}
       />
 
-      {/* Fine paper grain */}
       <div
         className="absolute inset-0 opacity-[0.035] mix-blend-multiply"
         style={{
@@ -43,13 +48,14 @@ export function ExperiencePageWash({ theme, className }: ExperiencePageWashProps
         }}
       />
 
-      {/* Very light ruled texture — letter-like, not loud */}
-      <div
-        className="absolute inset-0 opacity-[0.035]"
-        style={{
-          backgroundImage: `repeating-linear-gradient(0deg, transparent, transparent 27px, ${theme.line} 28px)`,
-        }}
-      />
+      {density === "reading" ? (
+        <div
+          className="absolute inset-0 opacity-[0.035]"
+          style={{
+            backgroundImage: `repeating-linear-gradient(0deg, transparent, transparent 27px, ${theme.line} 28px)`,
+          }}
+        />
+      ) : null}
     </div>
   );
 }

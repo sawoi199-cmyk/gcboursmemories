@@ -2,8 +2,8 @@
 
 import { usePathname } from "next/navigation";
 import type { CSSProperties, ReactNode } from "react";
+import { AtmospherePageWash } from "@/components/experience/atmosphere-page-wash";
 import { ExperienceNav } from "@/components/experience/experience-nav";
-import { ExperiencePageWash } from "@/components/experience/experience-page-wash";
 import { PageTransition } from "@/components/motion/page-transition";
 import { PERIOD_PAGE_THEME } from "@/lib/atmosphere/day-period";
 import { useDayPeriod } from "@/lib/atmosphere/use-day-period";
@@ -35,7 +35,7 @@ export function ExperienceShell({ children }: { children: ReactNode }) {
       )}
       style={isHero ? undefined : pageVars}
     >
-      {!isHero ? <ExperiencePageWash theme={theme} /> : null}
+      {!isHero ? <AtmospherePageWash theme={theme} density="reading" /> : null}
 
       <ExperienceNav overHero={isHero} />
 
