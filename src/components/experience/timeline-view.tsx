@@ -1,11 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useMemo, useState, useTransition } from "react";
+import { useCallback, useMemo, useRef, useState, useTransition } from "react";
+import { InfiniteScrollSentinel } from "@/components/experience/infinite-scroll-sentinel";
 import { PhotoPlaceholder } from "@/components/experience/photo-placeholder";
 import { TimelineCalendar } from "@/components/experience/timeline-calendar";
 import { FadeIn } from "@/components/motion/fade-in";
-import { buttonVariants } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/status-blocks";
 import type { ChapterId } from "@/config/chapters";
 import type {
@@ -75,6 +75,7 @@ export function TimelineView({
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [loadingMore, setLoadingMore] = useState(false);
+  const loadingMoreRef = useRef(false);
 
   const reload = useCallback(
     (nextFilter: FilterId, nextEventDate: string | null) => {
@@ -108,8 +109,9 @@ export function TimelineView({
     [],
   );
 
-  async function loadMore() {
-    if (!nextCursor || loadingMore) return;
+  const loadMore = useCallback(async () => {
+    if (!nextCursor || loadingMoreRef.current || pending) return;
+    loadingMoreRef.current = true;
     setLoadingMore(true);
     setError(null);
     try {
@@ -137,9 +139,10 @@ export function TimelineView({
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "加载失败");
     } finally {
+      loadingMoreRef.current = false;
       setLoadingMore(false);
     }
-  }
+  }, [eventDate, filter, nextCursor, pending]);
 
   const selectedLabel = useMemo(() => {
     if (!eventDate) return null;
@@ -227,7 +230,16 @@ export function TimelineView({
 
       {error ? (
         <p className="mt-4 text-sm text-accent-ours" role="alert">
-          {error}
+          {error}{" "}
+          {nextCursor ? (
+            <button
+              type="button"
+              className="underline underline-offset-4"
+              onClick={() => void loadMore()}
+            >
+              重试
+            </button>
+          ) : null}
         </p>
       ) : null}
 
@@ -293,22 +305,14 @@ export function TimelineView({
             })}
           </ul>
 
-          {nextCursor ? (
-            <div className="mt-10 flex justify-center">
-              <button
-                type="button"
-                disabled={loadingMore || pending}
-                onClick={() => void loadMore()}
-                className={cn(
-                  buttonVariants({ variant: "outline", size: "lg" }),
-                  "border-line bg-paper text-ink",
-                )}
-              >
-                {loadingMore ? "加载中…" : "加载更多"}
-              </button>
-            </div>
-          ) : memories.length > 0 ? (
-            <p className="mt-10 text-center text-xs text-muted-ours">已经到尽头了</p>
+          <InfiniteScrollSentinel
+            hasMore={Boolean(nextCursor) && !pending}
+            loading={loadingMore}
+            onLoadMore={loadMore}
+          />
+
+          {!nextCursor && memories.length > 0 ? (
+            <p className="mt-2 text-center text-xs text-muted-ours">已经到尽头了</p>
           ) : null}
         </>
       )}

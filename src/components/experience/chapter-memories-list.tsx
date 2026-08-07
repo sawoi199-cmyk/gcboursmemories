@@ -1,16 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useCallback, useRef, useState } from "react";
+import { InfiniteScrollSentinel } from "@/components/experience/infinite-scroll-sentinel";
 import { PhotoPlaceholder } from "@/components/experience/photo-placeholder";
 import { FadeIn } from "@/components/motion/fade-in";
-import { buttonVariants } from "@/components/ui/button";
 import type { ChapterId } from "@/config/chapters";
 import type {
   PublishedMemory,
   TimelineCursor,
 } from "@/features/memories/published";
-import { cn } from "@/lib/utils";
 
 type ChapterMemoriesListProps = {
   chapterId: ChapterId;
@@ -35,9 +34,11 @@ export function ChapterMemoriesList({
   const [nextCursor, setNextCursor] = useState(initialCursor);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const loadingMoreRef = useRef(false);
 
-  async function loadMore() {
-    if (!nextCursor || loadingMore) return;
+  const loadMore = useCallback(async () => {
+    if (!nextCursor || loadingMoreRef.current) return;
+    loadingMoreRef.current = true;
     setLoadingMore(true);
     setError(null);
     try {
@@ -65,15 +66,25 @@ export function ChapterMemoriesList({
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "加载失败");
     } finally {
+      loadingMoreRef.current = false;
       setLoadingMore(false);
     }
-  }
+  }, [chapterId, nextCursor]);
 
   return (
     <>
       {error ? (
         <p className="mt-4 text-sm text-accent-ours" role="alert">
-          {error}
+          {error}{" "}
+          {nextCursor ? (
+            <button
+              type="button"
+              className="underline underline-offset-4"
+              onClick={() => void loadMore()}
+            >
+              重试
+            </button>
+          ) : null}
         </p>
       ) : null}
 
@@ -119,22 +130,14 @@ export function ChapterMemoriesList({
         })}
       </ul>
 
-      {nextCursor ? (
-        <div className="mt-10 flex justify-center">
-          <button
-            type="button"
-            disabled={loadingMore}
-            onClick={() => void loadMore()}
-            className={cn(
-              buttonVariants({ variant: "outline", size: "lg" }),
-              "border-line bg-paper text-ink",
-            )}
-          >
-            {loadingMore ? "加载中…" : "加载更多"}
-          </button>
-        </div>
-      ) : memories.length > 0 ? (
-        <p className="mt-10 text-center text-xs text-muted-ours">这一章已经读完了</p>
+      <InfiniteScrollSentinel
+        hasMore={Boolean(nextCursor)}
+        loading={loadingMore}
+        onLoadMore={loadMore}
+      />
+
+      {!nextCursor && memories.length > 0 ? (
+        <p className="mt-2 text-center text-xs text-muted-ours">这一章已经读完了</p>
       ) : null}
     </>
   );
