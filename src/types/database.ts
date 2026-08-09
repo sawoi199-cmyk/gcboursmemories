@@ -191,6 +191,25 @@ export type Database = {
         };
         Update: Partial<Database["public"]["Tables"]["letters"]["Insert"]>;
       };
+      letter_replies: {
+        Row: {
+          id: string;
+          owner_id: string;
+          letter_id: string;
+          body: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          owner_id: string;
+          letter_id: string;
+          body: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["letter_replies"]["Insert"]>;
+      };
     };
   };
 };

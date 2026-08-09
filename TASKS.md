@@ -36,6 +36,7 @@ Phase 8 — 测试与部署（已落地骨架；生产部署需你在 Vercel/Sup
 - Bugfix：`/studio/templates` 版式卡片原先是静态 `<li>`，点击无反应；现改为可点选并切换下方预览
 - Bugfix：Studio 编辑器「故事章节」下拉曾写死默认文案，且误读 `site_settings`；现从 `relationship_settings.chapter_labels` 经 `getEditorMemory` 注入 `chapterLabels`
 - 代码健康：信件页读取已发布的 `letters` 数据；移除未引用 mock 导出与未使用 `shadcn` 依赖；日期显示统一为 `formatArchiveDate`
+- 功能：信件页支持写入并修改一封私密回信（`letter_replies` migration + 前台表单）
 - 性能：`getEditorMemory` 缩略图改 `createSignedUrls` 批量签名，并与 siblings/versions/settings 并行查询，缩短打开编辑页等待
 - 性能：前台时间线/故事封面批量签名 + 60s `unstable_cache`（发布/保存失效）+ `loading.tsx` 骨架（Decision 013）
 - 性能：时间线分页「加载更多」（每页 20）+ Instagram 式日历按日筛选（Decision 014）

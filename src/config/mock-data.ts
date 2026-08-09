@@ -124,6 +124,7 @@ export const mockMemories: Array<
 ];
 
 export const mockLetter = {
+  id: "mock-letter",
   title: "写给你的一封信",
   letterDate: "2026-09-14",
   body: `这个档案没有最后一页。
@@ -143,6 +144,7 @@ export const mockLetter = {
 生日快乐。
 谢谢你来到我的生命里，
 也谢谢你愿意陪我一起，把未来写下去。`,
+  replyBody: null,
 } as const;
 
 export function getMemoryById(id: string) {

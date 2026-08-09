@@ -22,5 +22,5 @@ export default async function LetterPage() {
     );
   }
 
-  return <LetterContent letter={letter ?? mockLetter} />;
+  return <LetterContent letter={letter ?? mockLetter} canReply={Boolean(letter)} />;
 }

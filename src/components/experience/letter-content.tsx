@@ -2,12 +2,19 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { LetterReplyForm } from "@/components/experience/letter-reply-form";
 import { FadeIn } from "@/components/motion/fade-in";
 import { buttonVariants } from "@/components/ui/button";
 import type { PublishedLetter } from "@/features/letters/get-published-letter";
 import { cn } from "@/lib/utils";
 
-export function LetterContent({ letter }: { letter: PublishedLetter }) {
+export function LetterContent({
+  letter,
+  canReply,
+}: {
+  letter: PublishedLetter;
+  canReply: boolean;
+}) {
   const paragraphs = letter.body.split("\n\n");
   const [visibleCount, setVisibleCount] = useState(paragraphs.length);
 
@@ -63,6 +70,8 @@ export function LetterContent({ letter }: { letter: PublishedLetter }) {
           继续记录我们的故事
         </Link>
       </div>
+
+      {canReply ? <LetterReplyForm letterId={letter.id} initialReply={letter.replyBody} /> : null}
     </article>
   );
 }
