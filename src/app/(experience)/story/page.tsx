@@ -36,14 +36,18 @@ export default async function StoryPage() {
                   className="group grid gap-4 rounded-xl outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring sm:grid-cols-[140px_1fr] sm:items-center"
                 >
                   <div
-                    className="aspect-[4/3] overflow-hidden rounded-xl bg-cover bg-center shadow-[0_10px_30px_rgba(32,28,26,0.06)] transition-transform duration-200 group-hover:scale-[1.02] sm:aspect-square"
-                    style={
-                      chapter.coverUrl
-                        ? { backgroundImage: `url(${chapter.coverUrl})` }
-                        : { backgroundImage: chapter.coverGradient }
-                    }
-                    aria-hidden
-                  />
+                    className="relative aspect-[4/3] overflow-hidden rounded-xl bg-cover bg-center shadow-[0_10px_30px_rgba(32,28,26,0.06)] transition-transform duration-200 group-hover:scale-[1.02] sm:aspect-square"
+                    style={{ backgroundImage: chapter.coverGradient }}
+                  >
+                    {chapter.coverUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={chapter.coverUrl}
+                        alt={`${chapter.title}的回忆封面`}
+                        className="absolute inset-0 h-full w-full object-cover"
+                      />
+                    ) : null}
+                  </div>
                   <div>
                     <p className="text-xs tracking-[0.25em] text-gold">
                       {String(index + 1).padStart(2, "0")}

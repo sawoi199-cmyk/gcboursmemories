@@ -908,30 +908,38 @@ async function fetchStoryChaptersForOwner(ownerId: string): Promise<StoryChapter
   }
 
   const orderedKeys = CHAPTER_IDS.filter((key) => (groups.get(key)?.length ?? 0) > 0);
-  const coverEventIds = orderedKeys
-    .map((key) => groups.get(key)?.[0]?.id)
-    .filter((id): id is string => Boolean(id));
-
-  const coverLinkByEvent = new Map<string, PhotoLinkRow>();
-  if (coverEventIds.length > 0) {
+  const eventIds = events.map((event) => event.id);
+  const coverLinkByChapter = new Map<string, PhotoLinkRow>();
+  if (eventIds.length > 0) {
     const { data: links, error: linksError } = await supabase
       .from("event_photos")
       .select(
         "event_id, photo_id, role, sort_order, photos(id, original_filename, thumbnail_path, drive_file_id, width, height)",
       )
-      .in("event_id", coverEventIds)
+      .in("event_id", eventIds)
       .order("sort_order", { ascending: true });
 
     if (linksError) throw new Error(linksError.message);
 
     const linksByEvent = groupLinksByEvent((links ?? []) as PhotoLinkRow[]);
-    for (const eventId of coverEventIds) {
-      const cover = pickCoverLink(linksByEvent.get(eventId) ?? []);
-      if (cover) coverLinkByEvent.set(eventId, cover);
+    for (const key of orderedKeys) {
+      const chapterEvents = groups.get(key) ?? [];
+      for (const event of chapterEvents) {
+        const cover = pickCoverLink(linksByEvent.get(event.id) ?? []);
+        const photo = cover
+          ? Array.isArray(cover.photos)
+            ? cover.photos[0]
+            : cover.photos
+          : null;
+        if (cover && photo?.thumbnail_path) {
+          coverLinkByChapter.set(key, cover);
+          break;
+        }
+      }
     }
   }
 
-  const pathsToSign = [...coverLinkByEvent.values()]
+  const pathsToSign = [...coverLinkByChapter.values()]
     .map((link) => {
       const photo = Array.isArray(link.photos) ? link.photos[0] : link.photos;
       return photo?.thumbnail_path ?? null;
@@ -944,7 +952,7 @@ async function fetchStoryChaptersForOwner(ownerId: string): Promise<StoryChapter
     const list = groups.get(key) ?? [];
     const dates = list.map((item) => item.event_date).sort();
     const first = list[0];
-    const coverLink = first ? coverLinkByEvent.get(first.id) : undefined;
+    const coverLink = coverLinkByChapter.get(key);
     const coverPhoto = coverLink
       ? Array.isArray(coverLink.photos)
         ? coverLink.photos[0]

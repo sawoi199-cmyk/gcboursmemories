@@ -38,6 +38,7 @@ Phase 8 — 测试与部署（已落地骨架；生产部署需你在 Vercel/Sup
 - 代码健康：信件页读取已发布的 `letters` 数据；移除未引用 mock 导出与未使用 `shadcn` 依赖；日期显示统一为 `formatArchiveDate`
 - 功能：信件页支持写入并修改一封私密回信（`letter_replies` migration + 前台表单）
 - Bugfix：没有已发布数据库信件时仍显示原有信件内容；首次保存回信会将该信持久化为已发布信件
+- Bugfix：故事页章节封面改用缩略图 `<img>` 读取，并跳过没有缩略图的首条回忆以选择可用封面
 - 性能：`getEditorMemory` 缩略图改 `createSignedUrls` 批量签名，并与 siblings/versions/settings 并行查询，缩短打开编辑页等待
 - 性能：前台时间线/故事封面批量签名 + 60s `unstable_cache`（发布/保存失效）+ `loading.tsx` 骨架（Decision 013）
 - 性能：时间线分页「加载更多」（每页 20）+ Instagram 式日历按日筛选（Decision 014）
