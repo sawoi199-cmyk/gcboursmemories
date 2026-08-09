@@ -1,66 +1,26 @@
-"use client";
-
-import Link from "next/link";
-import { useState } from "react";
-import { FadeIn } from "@/components/motion/fade-in";
-import { buttonVariants } from "@/components/ui/button";
+import { LetterContent } from "@/components/experience/letter-content";
+import { EmptyState } from "@/components/ui/status-blocks";
 import { mockLetter } from "@/config/mock-data";
-import { cn } from "@/lib/utils";
+import { getPublishedLetter } from "@/features/letters/get-published-letter";
+import { isSupabaseConfigured } from "@/lib/supabase/env";
 
-export default function LetterPage() {
-  const paragraphs = mockLetter.body.split("\n\n");
-  const [visibleCount, setVisibleCount] = useState(paragraphs.length);
+export const dynamic = "force-dynamic";
 
-  function reread() {
-    setVisibleCount(0);
-    paragraphs.forEach((_, index) => {
-      window.setTimeout(() => {
-        setVisibleCount((current) => Math.max(current, index + 1));
-      }, 400 * (index + 1));
-    });
+export default async function LetterPage() {
+  const letter = await getPublishedLetter();
+
+  if (!letter && isSupabaseConfigured()) {
+    return (
+      <section className="mx-auto w-full max-w-3xl px-6 py-16">
+        <EmptyState
+          title="这封信还没有发布"
+          description="发布后，它会在这里等待被再次阅读。"
+          actionHref="/timeline"
+          actionLabel="先去时间线看看 →"
+        />
+      </section>
+    );
   }
 
-  return (
-    <article className="mx-auto w-full max-w-[720px] px-6 py-12 md:py-16">
-      <FadeIn>
-        <p className="text-xs tracking-[0.25em] text-gold uppercase">Letter</p>
-        <h1 className="mt-3 font-serif text-4xl text-ink">{mockLetter.title}</h1>
-        <p className="mt-2 text-xs text-muted-ours">{mockLetter.letterDate}</p>
-      </FadeIn>
-
-      <FadeIn delay={0.1}>
-        <div className="relative mt-10 overflow-hidden rounded-2xl border border-line bg-paper px-8 py-10 shadow-[0_18px_50px_rgba(32,28,26,0.06)] md:px-12 md:py-14">
-          <div
-            aria-hidden
-            className="pointer-events-none absolute inset-0 opacity-[0.35]"
-            style={{
-              backgroundImage:
-                "linear-gradient(#e8ded4 1px, transparent 1px)",
-              backgroundSize: "100% 2rem",
-            }}
-          />
-          <div className="relative space-y-6">
-            {paragraphs.slice(0, visibleCount).map((paragraph, index) => (
-              <p
-                key={`${paragraph}-${index}`}
-                className="whitespace-pre-wrap font-serif text-lg leading-9 text-ink/90"
-              >
-                {paragraph}
-              </p>
-            ))}
-          </div>
-          <p className="relative mt-12 font-serif text-base text-ink/70">——你的档案管理员</p>
-        </div>
-      </FadeIn>
-
-      <div className="mt-8 flex flex-wrap gap-3">
-        <button type="button" onClick={reread} className={cn(buttonVariants({ variant: "outline" }))}>
-          重新阅读
-        </button>
-        <Link href="/studio/upload" className={cn(buttonVariants())}>
-          继续记录我们的故事
-        </Link>
-      </div>
-    </article>
-  );
+  return <LetterContent letter={letter ?? mockLetter} />;
 }

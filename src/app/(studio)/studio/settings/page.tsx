@@ -5,7 +5,6 @@ import { StudioLogoutButton } from "@/components/studio/studio-logout-button";
 import { UnlockPasswordForm } from "@/components/studio/unlock-password-form";
 import { buttonVariants } from "@/components/ui/button";
 import { resolveChapterLabels, type ChapterId } from "@/config/chapters";
-import { mockRelationship } from "@/config/mock-data";
 import { getSiteOwnerId } from "@/lib/config/site-owner";
 import { getDriveConfigStatus, isDriveConfigured } from "@/lib/google-drive/gas-client";
 import { createServiceClient } from "@/lib/supabase/admin";
@@ -14,6 +13,7 @@ import { cn } from "@/lib/utils";
 
 const DEFAULT_OWNER_NAME = "臭宝";
 const DEFAULT_PARTNER_NAME = "乖宝";
+const DEFAULT_RELATIONSHIP_TITLE = "OURS";
 
 export default async function StudioSettingsPage() {
   const driveStatus = await getDriveConfigStatus();
@@ -22,6 +22,7 @@ export default async function StudioSettingsPage() {
   let passwordSet = false;
   let ownerName = DEFAULT_OWNER_NAME;
   let partnerName = DEFAULT_PARTNER_NAME;
+  let relationshipTitle = DEFAULT_RELATIONSHIP_TITLE;
   let chapterLabels = resolveChapterLabels(null);
   let settingsAvailable = false;
 
@@ -31,12 +32,13 @@ export default async function StudioSettingsPage() {
       const admin = createServiceClient();
       const { data } = await admin
         .from("relationship_settings")
-        .select("access_hash, chapter_labels, owner_name, partner_name")
+        .select("access_hash, chapter_labels, owner_name, partner_name, relationship_title")
         .eq("owner_id", ownerId)
         .maybeSingle();
       passwordSet = Boolean(data?.access_hash);
       ownerName = data?.owner_name ?? DEFAULT_OWNER_NAME;
       partnerName = data?.partner_name ?? DEFAULT_PARTNER_NAME;
+      relationshipTitle = data?.relationship_title ?? DEFAULT_RELATIONSHIP_TITLE;
       chapterLabels = resolveChapterLabels(
         (data?.chapter_labels as Partial<Record<ChapterId, string>> | null) ?? null,
       );
@@ -57,7 +59,7 @@ export default async function StudioSettingsPage() {
       </FadeIn>
 
       <dl className="mt-10 space-y-4">
-        <Row label="关系标题" value={mockRelationship.relationshipTitle} />
+        <Row label="关系标题" value={relationshipTitle} />
         <Row label="默认日记语气" value="温柔日记" />
         <Row
           label="Supabase"

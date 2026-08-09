@@ -1,86 +1,5 @@
 import type { EventPhoto, MemoryEvent } from "@/types/memory";
 
-export const mockStats = {
-  daysTogether: 593, // 2024-12-20 → 2026-08-04 inclusive
-  photoCount: 128,
-  placeCount: 18,
-  memoryCount: 12,
-  draftCount: 3,
-  pendingDateCount: 1,
-} as const;
-
-export const mockRelationship = {
-  relationshipTitle: "OURS",
-  partnerName: "乖宝",
-  ownerName: "臭宝",
-} as const;
-
-export const mockChapters = [
-  {
-    id: "beginning",
-    number: "01",
-    title: "我们的开始",
-    oneLine: "一切都还很轻，却已经记得很清楚。",
-    memoryCount: 2,
-    dateRange: "2023 — 2024",
-    gradient: "linear-gradient(145deg, #2a2420 0%, #b46a6a 48%, #c6a15b 100%)",
-  },
-  {
-    id: "ordinary_days",
-    number: "02",
-    title: "普通日子",
-    oneLine: "没有仪式的一天，也值得被保存。",
-    memoryCount: 4,
-    dateRange: "2024 — 2025",
-    gradient: "linear-gradient(160deg, #f6f1ea 0%, #e8ded4 40%, #7a706a 100%)",
-  },
-  {
-    id: "journeys",
-    number: "03",
-    title: "一起出发",
-    oneLine: "行李总是多带一点，笑声也是。",
-    memoryCount: 3,
-    dateRange: "2024 — 2025",
-    gradient: "linear-gradient(135deg, #1b1d22 0%, #3d4a5c 50%, #c6a15b 100%)",
-  },
-  {
-    id: "food_and_places",
-    number: "04",
-    title: "吃过的东西和去过的地方",
-    oneLine: "味道会消失，记录不会。",
-    memoryCount: 2,
-    dateRange: "2025",
-    gradient: "linear-gradient(150deg, #fffdf9 0%, #d4a574 55%, #201c1a 100%)",
-  },
-  {
-    id: "celebrations",
-    number: "05",
-    title: "值得庆祝的时刻",
-    oneLine: "蛋糕、蜡烛，还有没说完的话。",
-    memoryCount: 1,
-    dateRange: "2025",
-    gradient: "linear-gradient(145deg, #111216 0%, #b46a6a 45%, #fffdf9 100%)",
-  },
-  {
-    id: "growing_together",
-    number: "06",
-    title: "一起慢慢长大",
-    oneLine: "我们学会把小事说清楚。",
-    memoryCount: 0,
-    dateRange: "—",
-    gradient: "linear-gradient(160deg, #201c1a 0%, #7a706a 100%)",
-  },
-  {
-    id: "future",
-    number: "07",
-    title: "写给未来",
-    oneLine: "这一页还空着，正好留给以后。",
-    memoryCount: 0,
-    dateRange: "—",
-    gradient: "linear-gradient(180deg, #1b1d22 0%, #111216 100%)",
-  },
-] as const;
-
 const photo = (
   id: string,
   label: string,
@@ -204,30 +123,6 @@ export const mockMemories: Array<
   },
 ];
 
-export const mockDrafts = [
-  {
-    id: "00000000-0000-4000-8000-000000000010",
-    title: "未命名草稿 · 海边",
-    eventDate: "待确认",
-    photoCount: 6,
-    updatedAt: "刚刚自动保存",
-  },
-  {
-    id: "00000000-0000-4000-8000-000000000011",
-    title: "商场里的雨天",
-    eventDate: "2025-07-12",
-    photoCount: 4,
-    updatedAt: "昨天",
-  },
-  {
-    id: "00000000-0000-4000-8000-000000000012",
-    title: "深夜便利店",
-    eventDate: "2025-07-28",
-    photoCount: 3,
-    updatedAt: "3 天前",
-  },
-] as const;
-
 export const mockLetter = {
   title: "写给你的一封信",
   letterDate: "2026-09-14",
@@ -250,15 +145,6 @@ export const mockLetter = {
 也谢谢你愿意陪我一起，把未来写下去。`,
 } as const;
 
-export function getMemoryBySlug(slug: string) {
-  return mockMemories.find((memory) => memory.slug === slug);
-}
-
 export function getMemoryById(id: string) {
   return mockMemories.find((memory) => memory.id === id) ?? mockMemories[0];
-}
-
-export function formatDisplayDate(isoDate: string) {
-  const [year, month, day] = isoDate.split("-");
-  return { year, month, day, short: `${month}.${day}` };
 }

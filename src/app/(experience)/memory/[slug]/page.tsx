@@ -3,18 +3,11 @@ import { notFound } from "next/navigation";
 import { FadeIn } from "@/components/motion/fade-in";
 import { getPublishedMemoryBySlug } from "@/features/memories/published";
 import { MemoryLayoutRenderer } from "@/features/templates/registry";
+import { formatArchiveDate } from "@/lib/utils/date";
 
 type MemoryPageProps = {
   params: Promise<{ slug: string }>;
 };
-
-function formatDisplayDate(isoDate: string) {
-  const date = new Date(`${isoDate}T00:00:00`);
-  return {
-    year: String(date.getFullYear()),
-    short: `${String(date.getMonth() + 1).padStart(2, "0")}.${String(date.getDate()).padStart(2, "0")}`,
-  };
-}
 
 export default async function MemoryPage({ params }: MemoryPageProps) {
   const { slug } = await params;
@@ -25,7 +18,7 @@ export default async function MemoryPage({ params }: MemoryPageProps) {
   }
 
   const { memory, prev, next } = payload;
-  const date = formatDisplayDate(memory.eventDate);
+  const date = formatArchiveDate(memory.eventDate);
 
   return (
     <article className="mx-auto w-full max-w-5xl px-4 py-10 sm:px-6 md:py-16">

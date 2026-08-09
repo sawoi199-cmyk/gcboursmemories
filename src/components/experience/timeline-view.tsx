@@ -15,6 +15,7 @@ import type {
   TimelinePageResult,
 } from "@/features/memories/published";
 import { cn } from "@/lib/utils";
+import { formatArchiveDate } from "@/lib/utils/date";
 
 const filters = [
   { id: "all", label: "全部" },
@@ -26,14 +27,6 @@ const filters = [
 ] as const;
 
 type FilterId = (typeof filters)[number]["id"];
-
-function formatDisplayDate(isoDate: string) {
-  const date = new Date(`${isoDate}T00:00:00`);
-  return {
-    year: String(date.getFullYear()),
-    short: `${String(date.getMonth() + 1).padStart(2, "0")}.${String(date.getDate()).padStart(2, "0")}`,
-  };
-}
 
 function buildQuery(params: {
   filterId: FilterId;
@@ -265,7 +258,7 @@ export function TimelineView({
         <>
           <ul className={cn("mt-10 space-y-10", pending && "opacity-60")}>
             {memories.map((memory, index) => {
-              const date = formatDisplayDate(memory.eventDate);
+              const date = formatArchiveDate(memory.eventDate);
               const cover = memory.photos[0];
 
               return (

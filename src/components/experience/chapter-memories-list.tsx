@@ -10,20 +10,13 @@ import type {
   PublishedMemory,
   TimelineCursor,
 } from "@/features/memories/published";
+import { formatArchiveDate } from "@/lib/utils/date";
 
 type ChapterMemoriesListProps = {
   chapterId: ChapterId;
   initialMemories: PublishedMemory[];
   initialCursor: TimelineCursor | null;
 };
-
-function formatDisplayDate(isoDate: string) {
-  const date = new Date(`${isoDate}T00:00:00`);
-  return {
-    year: String(date.getFullYear()),
-    short: `${String(date.getMonth() + 1).padStart(2, "0")}.${String(date.getDate()).padStart(2, "0")}`,
-  };
-}
 
 export function ChapterMemoriesList({
   chapterId,
@@ -90,7 +83,7 @@ export function ChapterMemoriesList({
 
       <ul className="mt-10 space-y-10">
         {memories.map((memory, index) => {
-          const date = formatDisplayDate(memory.eventDate);
+          const date = formatArchiveDate(memory.eventDate);
           const cover = memory.photos[0];
 
           return (
