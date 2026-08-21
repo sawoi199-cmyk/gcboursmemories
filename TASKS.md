@@ -12,6 +12,7 @@ Phase 8 — 测试与部署（已落地骨架；生产部署需你在 Vercel/Sup
 
 ### Phase 8
 - [x] **微调：整站共用密码**（Decision 011）— 去掉 Auth 日常门禁；`SITE_OWNER_ID` + bootstrap；欢迎文案与称呼可改；e2e/docs/env 同步
+- [x] 公开健康检查：`GET /api/health`（供 cronjob 定时请求）
 - [x] 单测补强（publish/unlock 集成向断言）
 - [x] Playwright 冒烟（unlock / studio→unlock / auth→unlock）
 - [x] GitHub Actions CI（validate + e2e）
