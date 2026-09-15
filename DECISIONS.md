@@ -176,3 +176,14 @@ Consequences:
 - 须重新部署含 `deleteFile` 的 GAS Web App，否则硬清理会留下 Drive 文件并记 warnings。
 - 删除不可应用内撤销；Drive 文件在 Google 回收站可短时找回。
 - `DELETE /api/memories/[id]`、`POST .../photos/remove`、`DELETE /api/photos/[id]`。
+
+## Decision 016
+
+Date: 2026-09-15
+Status: Accepted
+Context: 生产数据在新加坡；Vercel 新项目函数默认 `iad1`（美东），与新加坡 Supabase 跨洋，延迟和失败面都更大。
+Decision: `vercel.json` 将 Functions 固定为 `sin1`（Singapore / `ap-southeast-1`）。Supabase 生产项目必须建在 Southeast Asia (Singapore)。静态资源仍走全球 CDN。不在此决策里改应用时区或 `zh-CN` locale。
+Reason: 函数应贴着数据库；Hobby 只能选一个函数区域；与用户所在地一致。
+Consequences:
+- 下次部署后生效；Dashboard Function Regions 应显示 Singapore。
+- Supabase 区域创建后不可改；若现有项目不在新加坡，需新建新加坡项目并迁移。

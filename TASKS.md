@@ -11,6 +11,7 @@ Phase 8 — 测试与部署（已落地骨架；生产部署需你在 Vercel/Sup
 ## Completed
 
 ### Phase 8
+- [x] **部署区域：新加坡**（Decision 016）— `vercel.json` `regions: ["sin1"]`；文档要求 Supabase 为 Southeast Asia (Singapore)
 - [x] **微调：整站共用密码**（Decision 011）— 去掉 Auth 日常门禁；`SITE_OWNER_ID` + bootstrap；欢迎文案与称呼可改；e2e/docs/env 同步
 - [x] 公开健康检查：`GET /api/health`（供 cronjob 定时请求并验证 Supabase 数据库连通性）
 - [x] 单测补强（publish/unlock 集成向断言）

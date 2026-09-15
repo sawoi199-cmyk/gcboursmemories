@@ -11,6 +11,8 @@ This guide covers Vercel + Supabase + GAS for the private couple archive.
 
 ## 1. Production Supabase
 
+Region must be **Southeast Asia (Singapore)** (`ap-southeast-1`), same as Vercel Functions (`sin1`). Check: Dashboard → **Project Settings → General → Region**. Supabase cannot change region after creation — if it is not Singapore, create a new project there and migrate.
+
 1. Create / open the production Supabase project.
 2. In SQL Editor, run migrations **in order**:
    - `supabase/migrations/20260804000000_init.sql`
@@ -63,7 +65,8 @@ The experience **and** Studio share one site password. After unlock, a 30-day HM
 
 1. Import the GitHub repo into Vercel.
 2. Framework preset: Next.js.
-3. Set Environment Variables (Production + Preview as needed):
+3. Function region is pinned in `vercel.json` to **Singapore** (`sin1`), next to the Singapore Supabase project. Hobby allows one region. Confirm after deploy: **Project Settings → Functions → Function Regions**. Static assets stay on the global CDN.
+4. Set Environment Variables (Production + Preview as needed):
 
 | Name | Notes |
 | --- | --- |
@@ -81,7 +84,7 @@ The experience **and** Studio share one site password. After unlock, a 30-day HM
 | `AI_API_KEY` / `AI_MODEL` / `AI_BASE_URL` | Only if using real AI |
 | `AI_VISION` | usually `false` |
 
-4. Deploy. Confirm:
+5. Deploy. Confirm:
    - `/unlock` loads
    - `/` and `/studio` redirect to `/unlock` without a session cookie
    - After unlock with bootstrap or stored password, welcome shows nicknames and both experience + Studio are reachable
@@ -97,6 +100,7 @@ The experience **and** Studio share one site password. After unlock, a 30-day HM
 - [ ] Draft memories not visible without unlock session
 - [ ] Service role / GAS secret not present in browser Network payloads
 - [ ] Custom domain HTTPS only (if used)
+- [ ] Vercel Function region is Singapore (`sin1`); Supabase region is Southeast Asia (Singapore)
 
 ## 6. Local validation before each deploy
 
