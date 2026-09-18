@@ -36,3 +36,10 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 24. 所有敏感环境变量不得进入客户端。
 25. 未经用户确认不要开始下一阶段。
 26. 不使用 Cloudflare R2。
+
+## CodeGraph
+
+- 本项目使用根目录 `.codegraph/` 维护本地代码图谱。
+- 理解或定位代码、调用链和变更影响时，优先使用 MCP `codegraph_explore`；MCP 不可用时使用 `codegraph explore "<问题或符号>"`。
+- 新版 `codegraph serve --mcp` 会自动监听并同步文件变化。结构性修改后运行 `codegraph status` 验证；仅在监听器不可用或状态显示未同步时运行 `codegraph sync`。
+- 不要手动编辑 `.codegraph` 数据库，也不要使用旧版 `mcp__codegraph__index_project` 或 `mcp__codegraph__add_decision` 工具名。

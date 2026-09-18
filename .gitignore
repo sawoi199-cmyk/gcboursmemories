@@ -45,3 +45,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# CodeGraph（本地代码图谱，不提交）
+.codegraph/
