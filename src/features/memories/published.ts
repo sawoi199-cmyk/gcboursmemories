@@ -13,7 +13,11 @@ import type { EventPhoto, MemoryEvent, MemoryStatus } from "@/types/memory";
 /** Shared tag for timeline / story / home / detail published reads. */
 export const PUBLISHED_CACHE_TAG = "published-archive";
 
-/** Short server cache; signed URLs remain valid (TTL 1h). */
+/**
+ * Short server cache for durable metadata only. Do NOT bake signed image URLs
+ * into unstable_cache: a stale-served entry can outlive signedUrlTtlSeconds and
+ * hand back an expired link (broken image on open). Sign per-request instead.
+ */
 const PUBLISHED_CACHE_REVALIDATE_SECONDS = 60;
 
 export type PublishedMemory = MemoryEvent & {
@@ -219,23 +223,13 @@ async function loadPhotosForEvent(
     .order("sort_order", { ascending: true });
 
   const rows = (links ?? []) as PhotoLinkRow[];
-  const paths = rows
-    .map((link) => {
-      const photo = Array.isArray(link.photos) ? link.photos[0] : link.photos;
-      return photo?.thumbnail_path ?? null;
-    })
-    .filter((path): path is string => Boolean(path));
 
-  const signedByPath = await signThumbnailsBatch(supabase, paths);
-
+  // No signing here: URLs are minted per-request by signPublishedMemories,
+  // outside the Data Cache. This helper only produces durable thumbnailPath.
   return rows
-    .map((link, photoIndex) => {
-      const photo = Array.isArray(link.photos) ? link.photos[0] : link.photos;
-      const thumbnailUrl = photo?.thumbnail_path
-        ? (signedByPath.get(photo.thumbnail_path) ?? null)
-        : null;
-      return mapPhotoFromLink(link, gradientBase + photoIndex, thumbnailUrl);
-    })
+    .map((link, photoIndex) =>
+      mapPhotoFromLink(link, gradientBase + photoIndex, null),
+    )
     .filter((photo): photo is NonNullable<typeof photo> => Boolean(photo));
 }
 
@@ -429,28 +423,51 @@ async function hydrateEventsWithCovers(
 
   const linksByEvent = groupLinksByEvent((allLinks ?? []) as PhotoLinkRow[]);
   const coverByEvent = new Map<string, PhotoLinkRow>();
-  const pathsToSign: string[] = [];
 
   for (const event of eventRows) {
     const cover = pickCoverLink(linksByEvent.get(event.id) ?? []);
     if (!cover) continue;
     coverByEvent.set(event.id, cover);
-    const photo = Array.isArray(cover.photos) ? cover.photos[0] : cover.photos;
-    if (photo?.thumbnail_path) pathsToSign.push(photo.thumbnail_path);
   }
 
-  const signedByPath = await signThumbnailsBatch(supabase, pathsToSign);
-
+  // No signing here: URLs are minted per-request by signPublishedMemories,
+  // outside the Data Cache. Covers carry only durable thumbnailPath for now.
   return eventRows.map((event, index) => {
     const cover = coverByEvent.get(event.id);
     if (!cover) return mapEventRow(event, []);
-    const photo = Array.isArray(cover.photos) ? cover.photos[0] : cover.photos;
-    const thumbnailUrl = photo?.thumbnail_path
-      ? (signedByPath.get(photo.thumbnail_path) ?? null)
-      : null;
-    const mapped = mapPhotoFromLink(cover, index, thumbnailUrl);
+    const mapped = mapPhotoFromLink(cover, index, null);
     return mapEventRow(event, mapped ? [mapped] : []);
   });
+}
+
+/**
+ * Fill each photo's thumbnailUrl by signing its durable thumbnailPath. Runs
+ * per-request, OUTSIDE unstable_cache, so cached memory metadata never embeds an
+ * expiring signed URL (a stale-served cache entry could otherwise outlive
+ * signedUrlTtlSeconds and hand back a dead link). See PUBLISHED_CACHE_TAG.
+ */
+async function signPublishedMemories(
+  supabase: ServiceClient,
+  memories: PublishedMemory[],
+): Promise<PublishedMemory[]> {
+  const paths = memories.flatMap((memory) =>
+    memory.photos
+      .map((photo) => photo.thumbnailPath)
+      .filter((path): path is string => Boolean(path)),
+  );
+  if (paths.length === 0) return memories;
+
+  const signedByPath = await signThumbnailsBatch(supabase, paths);
+
+  return memories.map((memory) => ({
+    ...memory,
+    photos: memory.photos.map((photo) => ({
+      ...photo,
+      thumbnailUrl: photo.thumbnailPath
+        ? (signedByPath.get(photo.thumbnailPath) ?? null)
+        : null,
+    })),
+  }));
 }
 
 /** Timeline list: cover photo only + batch signed URLs. */
@@ -552,8 +569,18 @@ export async function getPublishedTimelinePage(input: {
     50,
   );
 
-  // Paginated pages are not Data-Cached (cursor cardinality); covers stay cheap via batch sign.
-  return fetchPublishedTimelinePageForOwner(ownerId, filters, cursor, limit);
+  // Paginated pages are not Data-Cached (cursor cardinality). Covers are signed
+  // per-request below via signPublishedMemories, so URLs are always fresh.
+  const page = await fetchPublishedTimelinePageForOwner(
+    ownerId,
+    filters,
+    cursor,
+    limit,
+  );
+  return {
+    ...page,
+    memories: await signPublishedMemories(createServiceClient(), page.memories),
+  };
 }
 
 async function fetchPublishedChapterMetaForOwner(
@@ -709,24 +736,34 @@ export async function getPublishedChapterPage(input: {
     50,
   );
 
-  if (cursor) {
-    return fetchPublishedChapterPageForOwner(
-      ownerId,
-      input.chapterId,
-      cursor,
-      limit,
-    );
-  }
+  // First page is Data-Cached (metadata only); cursor pages are not. Either way,
+  // covers are signed per-request below via signPublishedMemories.
+  const page = cursor
+    ? await fetchPublishedChapterPageForOwner(
+        ownerId,
+        input.chapterId,
+        cursor,
+        limit,
+      )
+    : await unstable_cache(
+        () =>
+          fetchPublishedChapterPageForOwner(
+            ownerId,
+            input.chapterId,
+            null,
+            limit,
+          ),
+        ["chapter-page", ownerId, input.chapterId, String(limit)],
+        {
+          revalidate: PUBLISHED_CACHE_REVALIDATE_SECONDS,
+          tags: [PUBLISHED_CACHE_TAG],
+        },
+      )();
 
-  return unstable_cache(
-    () =>
-      fetchPublishedChapterPageForOwner(ownerId, input.chapterId, null, limit),
-    ["chapter-page", ownerId, input.chapterId, String(limit)],
-    {
-      revalidate: PUBLISHED_CACHE_REVALIDATE_SECONDS,
-      tags: [PUBLISHED_CACHE_TAG],
-    },
-  )();
+  return {
+    ...page,
+    memories: await signPublishedMemories(createServiceClient(), page.memories),
+  };
 }
 
 async function fetchPublishedCalendarDaysForOwner(
@@ -775,7 +812,7 @@ export async function getPublishedMemories(): Promise<PublishedMemory[]> {
   const ownerId = tryGetSiteOwnerId();
   if (!ownerId) return [];
 
-  return unstable_cache(
+  const memories = await unstable_cache(
     () => fetchPublishedMemoriesForOwner(ownerId),
     ["published-memories", ownerId],
     {
@@ -783,6 +820,8 @@ export async function getPublishedMemories(): Promise<PublishedMemory[]> {
       tags: [PUBLISHED_CACHE_TAG],
     },
   )();
+
+  return signPublishedMemories(createServiceClient(), memories);
 }
 
 async function fetchPublishedMemoryBySlugForOwner(
@@ -840,7 +879,7 @@ export async function getPublishedMemoryBySlug(slug: string): Promise<{
   const ownerId = tryGetSiteOwnerId();
   if (!ownerId) return null;
 
-  return unstable_cache(
+  const result = await unstable_cache(
     () => fetchPublishedMemoryBySlugForOwner(ownerId, slug),
     ["published-memory", ownerId, slug],
     {
@@ -848,6 +887,13 @@ export async function getPublishedMemoryBySlug(slug: string): Promise<{
       tags: [PUBLISHED_CACHE_TAG],
     },
   )();
+
+  if (!result) return null;
+
+  const [memory] = await signPublishedMemories(createServiceClient(), [
+    result.memory,
+  ]);
+  return { ...result, memory };
 }
 
 export type StoryChapter = {
@@ -860,6 +906,16 @@ export type StoryChapter = {
   coverGradient: string;
 };
 
+/**
+ * Cached shape for story chapters. Holds the durable thumbnail PATH instead of
+ * a signed URL: signed URLs expire (signedUrlTtlSeconds), and unstable_cache can
+ * serve a stale entry older than that TTL, which would embed an expired link.
+ * Signing happens per-request in getStoryChapters, outside the Data Cache.
+ */
+type StoryChapterCacheEntry = Omit<StoryChapter, "coverUrl"> & {
+  coverPath: string | null;
+};
+
 type StoryEventRow = {
   id: string;
   title: string;
@@ -868,7 +924,9 @@ type StoryEventRow = {
   chapter: string | null;
 };
 
-async function fetchStoryChaptersForOwner(ownerId: string): Promise<StoryChapter[]> {
+async function fetchStoryChaptersForOwner(
+  ownerId: string,
+): Promise<StoryChapterCacheEntry[]> {
   const supabase = createServiceClient();
 
   const [eventsResult, settingsResult] = await Promise.all([
@@ -939,15 +997,6 @@ async function fetchStoryChaptersForOwner(ownerId: string): Promise<StoryChapter
     }
   }
 
-  const pathsToSign = [...coverLinkByChapter.values()]
-    .map((link) => {
-      const photo = Array.isArray(link.photos) ? link.photos[0] : link.photos;
-      return photo?.thumbnail_path ?? null;
-    })
-    .filter((path): path is string => Boolean(path));
-
-  const signedByPath = await signThumbnailsBatch(supabase, pathsToSign);
-
   return orderedKeys.map((key, index) => {
     const list = groups.get(key) ?? [];
     const dates = list.map((item) => item.event_date).sort();
@@ -957,9 +1006,6 @@ async function fetchStoryChaptersForOwner(ownerId: string): Promise<StoryChapter
       ? Array.isArray(coverLink.photos)
         ? coverLink.photos[0]
         : coverLink.photos
-      : null;
-    const coverUrl = coverPhoto?.thumbnail_path
-      ? (signedByPath.get(coverPhoto.thumbnail_path) ?? null)
       : null;
 
     return {
@@ -973,7 +1019,7 @@ async function fetchStoryChaptersForOwner(ownerId: string): Promise<StoryChapter
           : dates[0] === dates[dates.length - 1]
             ? dates[0]
             : `${dates[0]} — ${dates[dates.length - 1]}`,
-      coverUrl,
+      coverPath: coverPhoto?.thumbnail_path ?? null,
       coverGradient: gradientForIndex(index),
     };
   });
@@ -985,7 +1031,7 @@ export async function getStoryChapters(): Promise<StoryChapter[]> {
   const ownerId = tryGetSiteOwnerId();
   if (!ownerId) return [];
 
-  return unstable_cache(
+  const chapters = await unstable_cache(
     () => fetchStoryChaptersForOwner(ownerId),
     ["story-chapters", ownerId],
     {
@@ -993,6 +1039,24 @@ export async function getStoryChapters(): Promise<StoryChapter[]> {
       tags: [PUBLISHED_CACHE_TAG],
     },
   )();
+
+  // Sign cover thumbnails per-request, OUTSIDE the Data Cache. Signed URLs
+  // expire after signedUrlTtlSeconds; caching them lets a stale-served entry
+  // hand back an expired link (broken cover on open). Paths are durable, so
+  // the cache holds paths and we mint fresh URLs on every read — same approach
+  // as getPublishedTimelinePage.
+  const supabase = createServiceClient();
+  const signedByPath = await signThumbnailsBatch(
+    supabase,
+    chapters
+      .map((chapter) => chapter.coverPath)
+      .filter((path): path is string => Boolean(path)),
+  );
+
+  return chapters.map(({ coverPath, ...chapter }) => ({
+    ...chapter,
+    coverUrl: coverPath ? (signedByPath.get(coverPath) ?? null) : null,
+  }));
 }
 
 function isChapterKey(value: string, labels: Record<string, string>) {

@@ -187,3 +187,14 @@ Reason: 函数应贴着数据库；Hobby 只能选一个函数区域；与用户
 Consequences:
 - 下次部署后生效；Dashboard Function Regions 应显示 Singapore。
 - Supabase 区域创建后不可改；若现有项目不在新加坡，需新建新加坡项目并迁移。
+
+## Decision 017
+
+Date: 2026-09-18
+Status: Accepted
+Context: 故事页封面「点开常读不到图，过一会儿再打开才加载」，时间线却一直流畅。根因：`getStoryChapters` 用 `unstable_cache` 把**已签名的封面 URL**（TTL `signedUrlTtlSeconds`=1h）一并缓存；低频访问时缓存条目变陈旧，`stale-while-revalidate` 会先返回这份已过期签名 URL（Supabase 400 → 裂图），后台刷新后重开才正常。修订 Decision 013：签名 URL 不应进 Data Cache。
+Decision: 签名与缓存分离——`unstable_cache` 只存耐久元数据与缩略图**路径**（`thumbnailPath` / 故事的 `coverPath`），签名统一放到 getter 边界、每次请求现签（`signPublishedMemories`；故事走 `signThumbnailsBatch`）。`loadPhotosForEvent` 与 `hydrateEventsWithCovers` 不再签名，只产出路径。影响 `getStoryChapters`、`getPublishedChapterPage`（首屏）、`getPublishedMemoryBySlug`、`getPublishedMemories`；时间线本就现签，仅统一到同一辅助。
+Reason: 符合规则 22（治根因不绕过）；签名是廉价批量调用，放缓存外可保证 URL 永远新鲜；与时间线既有做法一致。
+Consequences:
+- 每次读取多一次批量签名调用（廉价），换取封面永不过期裂图。
+- 后续任何缓存化的图片读取都不得把签名 URL 烤进缓存，只缓存路径。

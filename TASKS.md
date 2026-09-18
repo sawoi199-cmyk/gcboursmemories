@@ -48,3 +48,4 @@ Phase 8 — 测试与部署（已落地骨架；生产部署需你在 Vercel/Sup
 - Final review：middleware 校验 DB `password_version`；`requireSiteSession` DB error→503；published/signed-original owner 作用域；logout 检查 response.ok
 - UX：上传向导去掉未接线的「补充真实记忆 / 假预览」步骤（Decision 012）；记忆与 AI 只在编辑器填写
 - 文案：去掉前台/Studio 可见的 Phase 开发期说明（今日页、上传向导、设置页）
+- Bugfix：故事封面「点开读不到图、过会儿重开才加载」——签名 URL 曾被 `unstable_cache` 缓存，陈旧返回时已过期。改为缓存只存缩略图路径、签名移到 getter 边界现签（`signPublishedMemories`）；同修 `getStoryChapters`/章节详情首屏/回忆详情/`getPublishedMemories`（Decision 017）
