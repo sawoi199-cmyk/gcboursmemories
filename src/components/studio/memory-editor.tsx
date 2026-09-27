@@ -8,10 +8,33 @@ import { FadeIn } from "@/components/motion/fade-in";
 import { DeleteMemoryButton } from "@/components/studio/delete-memory-button";
 import { buttonVariants } from "@/components/ui/button";
 import { CHAPTER_IDS, type ChapterId } from "@/config/chapters";
+import type { MemoryPhotoChange } from "@/features/memories/change-event-photos";
 import type { EditorMemoryPayload, EditorPhoto } from "@/features/memories/get-editor-memory";
 import { memoryTemplates, MemoryLayoutRenderer } from "@/features/templates/registry";
+import {
+  appendExifToFormData,
+  prepareFileForUpload,
+} from "@/lib/image/compress-for-upload";
 import { cn } from "@/lib/utils";
 import { buildPublishSlug } from "@/lib/utils/slug";
+
+const PHOTO_ACCEPT =
+  "image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif";
+
+function toEditorPhoto(photo: MemoryPhotoChange): EditorPhoto {
+  return {
+    id: photo.photoId,
+    photoId: photo.photoId,
+    label: photo.label,
+    alt: photo.alt,
+    role: photo.role,
+    orientation: photo.orientation,
+    gradient: photo.gradient,
+    thumbnailPath: photo.thumbnailPath,
+    thumbnailUrl: photo.thumbnailUrl,
+    takenAt: photo.takenAt,
+  };
+}
 
 type MemoryEditorProps = {
   initial: EditorMemoryPayload;
@@ -58,6 +81,12 @@ export function MemoryEditor({ initial }: MemoryEditorProps) {
   const [publishOpen, setPublishOpen] = useState(false);
   const [publishBusy, setPublishBusy] = useState(false);
   const [removeBusyId, setRemoveBusyId] = useState<string | null>(null);
+  const [replaceBusyId, setReplaceBusyId] = useState<string | null>(null);
+  const [appendProgress, setAppendProgress] = useState<string | null>(null);
+  const photoBusyRef = useRef(false);
+  const persistTailRef = useRef(Promise.resolve());
+  const photosLocked =
+    removeBusyId !== null || replaceBusyId !== null || appendProgress !== null;
 
   const memory = useMemo(
     () => ({
@@ -74,6 +103,23 @@ export function MemoryEditor({ initial }: MemoryEditorProps) {
   );
 
   async function persist(message = "已自动保存", options?: { throwOnError?: boolean }) {
+    const task = persistTailRef.current.then(async () => {
+      if (photoBusyRef.current) {
+        if (options?.throwOnError) {
+          throw new Error("照片正在更新，请稍后再试。");
+        }
+        return;
+      }
+      await persistNow(message, options);
+    });
+    persistTailRef.current = task.then(
+      () => undefined,
+      () => undefined,
+    );
+    return task;
+  }
+
+  async function persistNow(message = "已自动保存", options?: { throwOnError?: boolean }) {
     setSaving(true);
     setError(null);
     try {
@@ -341,11 +387,106 @@ export function MemoryEditor({ initial }: MemoryEditorProps) {
     }
   }
 
+  async function withPhotoMutation<T>(work: () => Promise<T>) {
+    photoBusyRef.current = true;
+    try {
+      await persistTailRef.current;
+      return await work();
+    } finally {
+      photoBusyRef.current = false;
+    }
+  }
+
+  async function postPhotoFile(
+    url: string,
+    file: File,
+    fields?: Record<string, string>,
+  ) {
+    const prepared = await prepareFileForUpload(file);
+    const body = new FormData();
+    body.append("file", prepared.file);
+    appendExifToFormData(body, prepared.exif);
+    if (fields) {
+      for (const [key, value] of Object.entries(fields)) {
+        body.set(key, value);
+      }
+    }
+    const response = await fetch(url, { method: "POST", body });
+    const json = (await response.json()) as {
+      ok?: boolean;
+      message?: string;
+      photo?: MemoryPhotoChange;
+      replacedPhotoId?: string;
+      warnings?: string[];
+    };
+    if (!response.ok || !json.ok || !json.photo) {
+      throw new Error(json.message ?? "Upload failed");
+    }
+    return {
+      photo: json.photo,
+      warnings: json.warnings,
+      replacedPhotoId: json.replacedPhotoId,
+    };
+  }
+
+  async function replacePhoto(photoId: string, file: File) {
+    setReplaceBusyId(photoId);
+    setError(null);
+    try {
+      await withPhotoMutation(async () => {
+        const json = await postPhotoFile(
+          `/api/memories/${initial.memory.id}/photos/replace`,
+          file,
+          { photoId },
+        );
+        const next = toEditorPhoto(json.photo);
+        setPhotos((current) =>
+          current.map((photo) => (photo.photoId === photoId ? { ...photo, ...next } : photo)),
+        );
+        setSelectedForSplit((current) =>
+          current.map((id) => (id === photoId ? next.photoId : id)),
+        );
+        const warning = json.warnings?.length ? ` · ${json.warnings[0]}` : "";
+        setSavedAt(`已更换照片${warning} · ${new Date().toLocaleTimeString("zh-CN")}`);
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Replace failed");
+    } finally {
+      setReplaceBusyId(null);
+    }
+  }
+
+  async function appendPhotos(files: File[]) {
+    setAppendProgress(`添加中 0/${files.length}`);
+    setError(null);
+    let addedCount = 0;
+    try {
+      await withPhotoMutation(async () => {
+        for (const [index, file] of files.entries()) {
+          setAppendProgress(`添加中 ${index + 1}/${files.length}`);
+          const json = await postPhotoFile(
+            `/api/memories/${initial.memory.id}/photos/append`,
+            file,
+          );
+          setPhotos((current) => [...current, toEditorPhoto(json.photo)]);
+          addedCount += 1;
+        }
+      });
+      setSavedAt(`已添加 ${addedCount} 张照片 · ${new Date().toLocaleTimeString("zh-CN")}`);
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : "Append failed";
+      setError(addedCount > 0 ? `已添加 ${addedCount} 张，其余未加入：${detail}` : detail);
+    } finally {
+      setAppendProgress(null);
+    }
+  }
+
   async function removePhoto(photoId: string) {
-    if (photos.length <= 1) return;
+    if (photos.length <= 1 || photosLocked) return;
     setRemoveBusyId(photoId);
     setError(null);
     try {
+      await withPhotoMutation(async () => {
       const response = await fetch(`/api/memories/${initial.memory.id}/photos/remove`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -370,6 +511,7 @@ export function MemoryEditor({ initial }: MemoryEditorProps) {
       });
       setSelectedForSplit((current) => current.filter((id) => id !== photoId));
       setSavedAt(`已移除照片 · ${new Date().toLocaleTimeString("zh-CN")}`);
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Remove failed");
     } finally {
@@ -535,28 +677,50 @@ export function MemoryEditor({ initial }: MemoryEditorProps) {
                 <div className="mt-2 flex flex-wrap gap-1">
                   <button
                     type="button"
-                    className="rounded border border-line px-2 py-0.5 text-[10px]"
+                    disabled={photosLocked}
+                    className="rounded border border-line px-2 py-0.5 text-[10px] disabled:opacity-40"
                     onClick={() => movePhoto(index, -1)}
                   >
                     上移
                   </button>
                   <button
                     type="button"
-                    className="rounded border border-line px-2 py-0.5 text-[10px]"
+                    disabled={photosLocked}
+                    className="rounded border border-line px-2 py-0.5 text-[10px] disabled:opacity-40"
                     onClick={() => movePhoto(index, 1)}
                   >
                     下移
                   </button>
                   <button
                     type="button"
-                    className="rounded border border-line px-2 py-0.5 text-[10px]"
+                    disabled={photosLocked}
+                    className="rounded border border-line px-2 py-0.5 text-[10px] disabled:opacity-40"
                     onClick={() => setCover(index)}
                   >
                     设封面
                   </button>
+                  <label
+                    className={cn(
+                      "rounded border border-line px-2 py-0.5 text-[10px]",
+                      photosLocked && "pointer-events-none opacity-40",
+                    )}
+                  >
+                    {replaceBusyId === photo.photoId ? "更换中…" : "更换"}
+                    <input
+                      type="file"
+                      accept={PHOTO_ACCEPT}
+                      className="sr-only"
+                      disabled={photosLocked}
+                      onChange={(event) => {
+                        const file = event.target.files?.[0];
+                        event.target.value = "";
+                        if (file) void replacePhoto(photo.photoId, file);
+                      }}
+                    />
+                  </label>
                   <button
                     type="button"
-                    disabled={photos.length <= 1 || removeBusyId === photo.photoId}
+                    disabled={photos.length <= 1 || photosLocked}
                     title={photos.length <= 1 ? "至少保留一张；要删整条请用删除回忆" : "移除照片"}
                     className="rounded border border-line px-2 py-0.5 text-[10px] text-accent-ours disabled:opacity-40"
                     onClick={() => void removePhoto(photo.photoId)}
@@ -577,11 +741,37 @@ export function MemoryEditor({ initial }: MemoryEditorProps) {
           </ul>
 
           <div className="rounded-xl border border-dashed border-line p-3">
+            <p className="text-xs font-medium text-ink">添加照片</p>
+            <p className="mt-1 text-[11px] text-muted-ours">补进这条回忆，不必重新建草稿。</p>
+            <label
+              className={cn(
+                buttonVariants({ variant: "outline", size: "sm" }),
+                "mt-2",
+                photosLocked && "pointer-events-none opacity-40",
+              )}
+            >
+              {appendProgress ?? "选择照片"}
+              <input
+                type="file"
+                accept={PHOTO_ACCEPT}
+                multiple
+                className="sr-only"
+                disabled={photosLocked}
+                onChange={(event) => {
+                  const files = [...(event.target.files ?? [])];
+                  event.target.value = "";
+                  if (files.length > 0) void appendPhotos(files);
+                }}
+              />
+            </label>
+          </div>
+
+          <div className="rounded-xl border border-dashed border-line p-3">
             <p className="text-xs font-medium text-ink">拆分事件</p>
             <p className="mt-1 text-[11px] text-muted-ours">勾选照片后拆到新草稿。</p>
             <button
               type="button"
-              disabled={selectedForSplit.length === 0}
+              disabled={selectedForSplit.length === 0 || photosLocked}
               onClick={() => void handleSplit()}
               className={cn(buttonVariants({ variant: "outline", size: "sm" }), "mt-2")}
             >
@@ -605,7 +795,7 @@ export function MemoryEditor({ initial }: MemoryEditorProps) {
             </select>
             <button
               type="button"
-              disabled={!mergeSourceId}
+              disabled={!mergeSourceId || photosLocked}
               onClick={() => void handleMerge()}
               className={cn(buttonVariants({ variant: "outline", size: "sm" }), "mt-2")}
             >
