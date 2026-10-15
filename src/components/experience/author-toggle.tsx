@@ -57,10 +57,12 @@ export function AuthorToggle({
   author,
   names,
   onChange,
+  label = "我是",
 }: {
   author: WishAuthor;
   names: CoupleNames;
   onChange: (author: WishAuthor) => void;
+  label?: string;
 }) {
   const options: { value: WishAuthor; label: string }[] = [
     { value: "partner", label: names.partner },
@@ -68,8 +70,8 @@ export function AuthorToggle({
   ];
 
   return (
-    <div role="radiogroup" aria-label="我是" className="flex items-center gap-1.5 text-xs">
-      <span className="mr-1 text-muted-ours">我是</span>
+    <div role="radiogroup" aria-label={label} className="flex items-center gap-1.5 text-xs">
+      <span className="mr-1 text-muted-ours">{label}</span>
       {options.map((option) => (
         <button
           key={option.value}

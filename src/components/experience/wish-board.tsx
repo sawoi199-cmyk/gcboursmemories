@@ -286,6 +286,7 @@ function WishItem({
   const [doneOn, setDoneOn] = useState(() => todayLocalIsoDate());
   const [title, setTitle] = useState(wish.title);
   const [note, setNote] = useState(wish.note ?? "");
+  const [editAuthor, setEditAuthor] = useState<WishAuthor>(wish.author);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const isClient = useIsClient();
@@ -337,6 +338,7 @@ function WishItem({
   function startEdit() {
     setTitle(wish.title);
     setNote(wish.note ?? "");
+    setEditAuthor(wish.author);
     setMode("edit");
   }
 
@@ -346,7 +348,7 @@ function WishItem({
         <form
           onSubmit={(event) => {
             event.preventDefault();
-            void run(() => patchWish(wish.id, { title, note }));
+            void run(() => patchWish(wish.id, { title, note, author: editAuthor }));
           }}
           className="space-y-3"
         >
@@ -367,6 +369,7 @@ function WishItem({
             placeholder="备注（可选）"
             className="w-full resize-y rounded-xl border border-line bg-background px-3 py-2 text-sm leading-6 text-ink outline-none focus:border-gold"
           />
+          <AuthorToggle author={editAuthor} names={names} onChange={setEditAuthor} label="谁的愿望" />
           <div className="flex gap-2">
             <button type="submit" disabled={busy || !title.trim()} className={buttonVariants({ size: "sm" })}>
               {busy ? "保存中…" : "保存"}
