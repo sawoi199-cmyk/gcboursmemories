@@ -235,3 +235,15 @@ Consequences:
 - 删除流光会硬删原图与缩略图（Drive 回收站可短时找回）。
 - 发流光弹窗通过 portal 挂到 `body`，避免被体验页内容层的层叠上下文压在导航下面。
 - 本地 dev 若页面像是旧代码，先注销浏览器里的 PWA Service Worker（`/_next/static` 在 dev 下文件名不带 hash，会被 cache-first 命中旧包）；线上不受影响。
+
+## Decision 021
+
+Date: 2026-10-17
+Status: Accepted
+Context: 流光的那句话在方格页看不到；希望像 IG 一样把字放在照片上，并有模板、emoji 与贴纸。
+Decision: 装饰作为数据保存在 `moments.layout`（jsonb：`template`、浮动文字 `text{x,y,rotate,style}`、`stickers[]`），由 `MomentCard` 叠加渲染在原图之上，原图从不重新编码；发布后仍可随时改。坐标是 4:5 卡片的相对比例，卡片内字号/贴纸用容器查询单位（cqw）缩放，所以方格、详情、编辑器里的样子一致；文字字号设下限保证小卡可读。六种模板统一 4:5：简约、文字贴图、拍立得、胶片、便利贴、杂志大字（后两种文字可拖动）。贴纸 = 系统 emoji（可自定义输入）+ 自绘 SVG 装饰，不用外部图片。方格页改为两列（桌面三列）卡片墙，每张卡就是发布时的样子。服务端 `MomentLayoutSchema` 严格校验写入；读取用 `parseMomentLayout` 容错，坏数据回落简约模板。
+Reason: 字和贴纸不烧进图片 → 原图干净、可再编辑、无额外存储；4:5 统一卡片让墙面整齐；cqw 让同一份数据在任意尺寸下比例一致。
+Consequences:
+- 部署前需执行 `20261017000000_moment_layout.sql`（代码会读写 `layout` 列，先迁移再推送）。
+- emoji 在不同系统字体下外观略有差异。
+- 长句子在卡片里会被截断，详情页检测到截断时在卡片下方显示全文。

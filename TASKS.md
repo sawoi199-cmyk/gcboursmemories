@@ -1,15 +1,23 @@
 # Current Phase
 
-Phase 9b — 流光 + 愿望关联（已实现；需在 Supabase 执行 `20261016000000_moments.sql`）
+Phase 9c — 流光模板与贴纸（已实现；需在 Supabase 执行 `20261017000000_moment_layout.sql`）
 
 ## Todo
 
-- [ ] 在 Supabase SQL Editor 执行 `supabase/migrations/20261016000000_moments.sql`，然后上线验证 `/moments` 与愿望关联
+- [ ] 在 Supabase SQL Editor 执行 `supabase/migrations/20261017000000_moment_layout.sql`，然后上线验证流光模板与贴纸
 - [ ] 按 `docs/deploy.md` 配置 Vercel 生产环境变量（含 `SITE_OWNER_ID`、可选 `SITE_BOOTSTRAP_PASSWORD`）并首次部署
 - [ ] 按 `docs/privacy-checklist.md` 勾一遍
 - [ ] 微调体验（用户后续提）
 
 ## Completed
+
+### Phase 9c 流光模板与贴纸（Decision 021）
+- [x] `moments.layout` jsonb migration（模板、浮动文字位置/样式、贴纸）；`MomentLayoutSchema` Zod 校验，读取容错回落简约
+- [x] 六种模板：简约 / 文字贴图 / 拍立得 / 胶片 / 便利贴 / 杂志大字；统一 4:5 卡片，容器查询单位缩放、字号有下限
+- [x] 贴纸：40 个 emoji + 自定义 emoji + 12 个自绘装饰（胶带、爱心、星星、印章、日期章等）；拖动、缩放、旋转、删除，最多 24 个
+- [x] 编辑器：发布与编辑共用（编辑可改文字、日期、作者、模板、贴纸）；模板缩略图用真实照片预览
+- [x] 方格页改为两列（桌面三列）卡片墙，那句话直接可见；详情页长句子被卡片截断时在下方显示全文
+- [x] 单测：排版 schema / 容错解析 / JSON 字段
 
 ### Phase 9b 流光 + 愿望关联（Decision 020）
 - [x] `moments` 表 migration（一张照片 + 一句话 ≤140、日期、作者、`seq` 发布顺序）；`wishes.moment_id`（一愿望一流光）
@@ -19,6 +27,7 @@ Phase 9b — 流光 + 愿望关联（已实现；需在 Supabase 执行 `2026101
 - [x] 照片硬清理引用检查纳入 `moments`，避免误删流光照片（含 `DELETE /api/photos/[id]`）
 - [x] 抽出共享 `signThumbnailsBatch` / `IsoDateSchema` / 作者选择组件；导航与首页入口加「流光」；e2e 门禁用例
 - [x] 单测：流光 schema/游标、创建流程（先校验愿望、失败清理照片）、引用检查
+- [x] 已在生产 Supabase 执行 `20261016000000_moments.sql`
 
 ### Phase 9a 愿望清单（Decision 019）
 - [x] `wishes` 表 migration（标题 ≤60、备注 ≤300、作者 owner/partner、状态 wish/done + 实现日期一致性约束）

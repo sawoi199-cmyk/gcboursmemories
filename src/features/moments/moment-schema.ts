@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { LayoutJsonSchema, MomentLayoutSchema } from "@/features/moments/moment-layout";
 import { WishAuthorSchema } from "@/features/wishes/wish-schema";
 import { IsoDateSchema } from "@/lib/utils/iso-date";
 
@@ -13,6 +14,8 @@ export const CreateMomentFieldsSchema = z.object({
   takenOn: IsoDateSchema,
   author: WishAuthorSchema,
   wishId: z.uuid().optional(),
+  /** JSON-encoded MomentLayout; omitted → simple template. */
+  layout: LayoutJsonSchema.optional(),
 });
 export type CreateMomentFields = z.infer<typeof CreateMomentFieldsSchema>;
 
@@ -20,8 +23,10 @@ export const UpdateMomentSchema = z
   .object({
     caption: CaptionSchema.optional(),
     takenOn: IsoDateSchema.optional(),
+    author: WishAuthorSchema.optional(),
+    layout: MomentLayoutSchema.optional(),
   })
-  .refine((value) => value.caption !== undefined || value.takenOn !== undefined, {
+  .refine((value) => Object.values(value).some((field) => field !== undefined), {
     message: "Nothing to update",
   });
 export type UpdateMomentInput = z.infer<typeof UpdateMomentSchema>;
@@ -56,5 +61,6 @@ export function momentFieldsFromForm(form: FormData) {
     takenOn: text("takenOn"),
     author: text("author"),
     wishId: text("wishId"),
+    layout: text("layout"),
   };
 }

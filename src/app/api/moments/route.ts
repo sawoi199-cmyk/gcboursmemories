@@ -70,7 +70,7 @@ export async function POST(request: Request) {
     const fields = CreateMomentFieldsSchema.safeParse(momentFieldsFromForm(form));
     if (!fields.success) {
       return NextResponse.json(
-        { ok: false, message: "需要一句话（最多 140 字）和一个日期。" },
+        { ok: false, message: "需要一句话（最多 140 字）、一个日期，排版数据也要有效。" },
         { status: 400 },
       );
     }

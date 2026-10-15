@@ -5,6 +5,7 @@ import { useCallback, useState } from "react";
 import { Plus } from "lucide-react";
 import { InfiniteScrollSentinel } from "@/components/experience/infinite-scroll-sentinel";
 import { MomentComposer } from "@/components/experience/moment-composer";
+import { MomentCard } from "@/components/moments/moment-card";
 import { FadeIn } from "@/components/motion/fade-in";
 import { buttonVariants } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/status-blocks";
@@ -77,26 +78,20 @@ export function MomentsGrid({ initialMoments, initialCursor, names, canEdit }: M
           description="随手拍下的一刻，配一句话，就是一条流光。"
         />
       ) : (
-        <ul className="mt-8 grid grid-cols-3 gap-1 sm:gap-2">
+        <ul className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
           {moments.map((moment) => (
             <li key={moment.id}>
               <Link
                 href={`/moments/${moment.id}`}
-                className="group relative block aspect-square overflow-hidden rounded-md bg-paper bg-[linear-gradient(135deg,#efe4d6,#f7efe6)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/60 sm:rounded-lg"
+                aria-label={moment.caption}
+                className="block overflow-hidden rounded-xl shadow-[0_6px_18px_rgba(32,28,26,0.08)] transition-transform duration-300 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/60"
               >
-                {moment.thumbnailUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={moment.thumbnailUrl}
-                    alt={moment.caption}
-                    loading="lazy"
-                    className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
-                  />
-                ) : (
-                  <span className="absolute inset-0 grid place-items-center p-2 text-center text-xs text-muted-ours">
-                    {moment.caption}
-                  </span>
-                )}
+                <MomentCard
+                  photoUrl={moment.thumbnailUrl}
+                  caption={moment.caption}
+                  takenOn={moment.takenOn}
+                  layout={moment.layout}
+                />
               </Link>
             </li>
           ))}

@@ -39,6 +39,26 @@ describe("CreateMomentFieldsSchema", () => {
   });
 });
 
+describe("CreateMomentFieldsSchema layout", () => {
+  const base = { caption: "海边", takenOn: "2026-10-15", author: "partner" };
+
+  it("parses an optional JSON layout field", () => {
+    const result = CreateMomentFieldsSchema.parse({
+      ...base,
+      layout: JSON.stringify({ template: "polaroid", stickers: [] }),
+    });
+    expect(result.layout).toEqual({ template: "polaroid", stickers: [] });
+    expect(CreateMomentFieldsSchema.parse(base).layout).toBeUndefined();
+  });
+
+  it("rejects a malformed layout", () => {
+    expect(
+      CreateMomentFieldsSchema.safeParse({ ...base, layout: JSON.stringify({ template: "x" }) })
+        .success,
+    ).toBe(false);
+  });
+});
+
 describe("momentFieldsFromForm", () => {
   it("reads text fields and drops empty ones", () => {
     const form = new FormData();
@@ -52,6 +72,7 @@ describe("momentFieldsFromForm", () => {
       takenOn: "2026-10-15",
       author: "partner",
       wishId: undefined,
+      layout: undefined,
     });
   });
 });

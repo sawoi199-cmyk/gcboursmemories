@@ -246,6 +246,7 @@ export type Database = {
           caption: string;
           taken_on: string;
           author: "owner" | "partner";
+          layout: Json;
           created_at: string;
           updated_at: string;
         };
@@ -256,6 +257,7 @@ export type Database = {
           caption: string;
           taken_on: string;
           author: "owner" | "partner";
+          layout?: Json;
           created_at?: string;
           updated_at?: string;
         };

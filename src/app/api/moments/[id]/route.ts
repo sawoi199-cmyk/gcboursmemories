@@ -51,7 +51,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     const parsed = UpdateMomentSchema.safeParse(await request.json());
     if (!parsed.success) {
       return NextResponse.json(
-        { ok: false, message: "需要一句话（最多 140 字）和一个有效日期。" },
+        { ok: false, message: "需要一句话（最多 140 字）、有效日期和有效排版。" },
         { status: 400 },
       );
     }

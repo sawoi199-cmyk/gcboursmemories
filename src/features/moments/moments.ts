@@ -5,6 +5,11 @@ import {
 } from "@/features/photos/hard-delete-photos";
 import { uploadPhotoForOwner } from "@/features/uploads/upload-photo";
 import {
+  defaultLayout,
+  parseMomentLayout,
+  type MomentLayout,
+} from "@/features/moments/moment-layout";
+import {
   MOMENTS_PAGE_SIZE,
   momentCursorOrFilter,
   type CreateMomentFields,
@@ -26,6 +31,7 @@ export type MomentTile = {
   caption: string;
   takenOn: string;
   thumbnailUrl: string | null;
+  layout: MomentLayout;
 };
 
 export type MomentDetail = MomentTile & {
@@ -60,11 +66,12 @@ type MomentRow = {
   taken_on: string;
   author: WishAuthor;
   photo_id: string;
+  layout: unknown;
   photo: PhotoEmbed | PhotoEmbed[] | null;
 };
 
 const MOMENT_COLUMNS =
-  "id, seq, caption, taken_on, author, photo_id, photo:photos(thumbnail_path, width, height)";
+  "id, seq, caption, taken_on, author, photo_id, layout, photo:photos(thumbnail_path, width, height)";
 
 function embeddedPhoto(row: MomentRow): PhotoEmbed | null {
   return Array.isArray(row.photo) ? (row.photo[0] ?? null) : row.photo;
@@ -88,6 +95,7 @@ function toTile(row: MomentRow, thumbnailUrl: string | null): MomentTile {
     caption: row.caption,
     takenOn: row.taken_on,
     thumbnailUrl,
+    layout: parseMomentLayout(row.layout),
   };
 }
 
@@ -223,6 +231,7 @@ export async function createMoment(input: {
       caption: fields.caption,
       taken_on: fields.takenOn,
       author: fields.author,
+      layout: fields.layout ?? defaultLayout(),
     })
     .select("id")
     .single();
@@ -258,9 +267,12 @@ export async function updateMoment(
   input: UpdateMomentInput,
 ): Promise<MomentDetail | null> {
   const supabase = createServiceClient();
-  const update: { caption?: string; taken_on?: string } = {};
+  const update: { caption?: string; taken_on?: string; author?: WishAuthor; layout?: MomentLayout } =
+    {};
   if (input.caption !== undefined) update.caption = input.caption;
   if (input.takenOn !== undefined) update.taken_on = input.takenOn;
+  if (input.author !== undefined) update.author = input.author;
+  if (input.layout !== undefined) update.layout = input.layout;
 
   const { data, error } = await supabase
     .from("moments")
