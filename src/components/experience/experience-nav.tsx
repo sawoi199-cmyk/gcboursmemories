@@ -7,6 +7,7 @@ const experienceLinks = [
   { href: "/", label: "开场" },
   { href: "/story", label: "故事" },
   { href: "/timeline", label: "时间线" },
+  { href: "/wishes", label: "愿望" },
   { href: "/letter", label: "信件" },
 ] as const;
 

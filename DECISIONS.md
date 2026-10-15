@@ -210,3 +210,15 @@ Consequences:
 - `POST /api/memories/[id]/photos/replace` 与 `POST /api/memories/[id]/photos/append`。
 - 更换会丢掉旧原图（Drive 回收站可短时找回）；GAS 须已含 `deleteFile`。
 - 照片 id 会变，排序和封面位置保持不变。
+
+## Decision 019
+
+Date: 2026-10-15
+Status: Accepted
+Context: 想要一份两个人共同维护的愿望清单。站点是共用密码（Decision 011），系统分不出谁在操作；愿望应该随手就写，不该走 Studio 的草稿/发布流程。
+Decision: 新增 `wishes` 表，前台 `/wishes` 直接读写（同回信模式：`requireSiteSession` + Service Role + `owner_id = SITE_OWNER_ID`）。作者由写入时选择「我是 乖宝/臭宝」记录为 `author`（owner/partner），称呼读 `relationship_settings`；上次选择只存在浏览器 localStorage（便利项，读不到默认 partner）。状态只有 wish/done，`done_on` 由数据库约束与状态同步；撤回即清空日期。无 AI、无发布。愿望与流光的关联延到 Phase 9b 再定。
+Reason: 轻量、两个人都能随手写；不引入身份系统；约束放在数据库保证数据一致。
+Consequences:
+- 部署前需执行 `20261015000000_wishes.sql`。
+- 许愿日期按浏览者本地时区在客户端渲染，避免服务端 UTC 造成的水合不一致。
+- 删除不可撤销（有确认框）。

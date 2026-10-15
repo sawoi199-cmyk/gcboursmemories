@@ -12,6 +12,11 @@ test.describe("OURS smoke", () => {
     await expect(page).toHaveURL(/\/unlock/);
   });
 
+  test("wish list requires site unlock", async ({ page }) => {
+    await page.goto("/wishes");
+    await expect(page).toHaveURL(/\/unlock/);
+  });
+
   test("studio requires site unlock", async ({ page }) => {
     await page.goto("/studio");
     await expect(page).toHaveURL(/\/unlock/);

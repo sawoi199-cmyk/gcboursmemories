@@ -1,14 +1,23 @@
 # Current Phase
 
-Phase 8 — 测试与部署（已落地骨架；生产部署需你在 Vercel/Supabase 点一次）
+Phase 9a — 愿望清单（已实现；需在 Supabase 执行 `20261015000000_wishes.sql`）
 
 ## Todo
 
+- [ ] 在 Supabase SQL Editor 执行 `supabase/migrations/20261015000000_wishes.sql`，然后上线验证 `/wishes`
+- [ ] Phase 9b 流光（一张照片 + 一句话；开始前确认愿望是否关联流光）
 - [ ] 按 `docs/deploy.md` 配置 Vercel 生产环境变量（含 `SITE_OWNER_ID`、可选 `SITE_BOOTSTRAP_PASSWORD`）并首次部署
 - [ ] 按 `docs/privacy-checklist.md` 勾一遍
 - [ ] 微调体验（用户后续提）
 
 ## Completed
+
+### Phase 9a 愿望清单（Decision 019）
+- [x] `wishes` 表 migration（标题 ≤60、备注 ≤300、作者 owner/partner、状态 wish/done + 实现日期一致性约束）
+- [x] `POST /api/wishes`、`PATCH/DELETE /api/wishes/[id]`（站点会话 + Zod + `owner_id` 作用域）
+- [x] 前台 `/wishes`：快速许愿、「我是 乖宝/臭宝」记住上次选择、想做的/已实现分组、实现日期、撤回、编辑、删除确认
+- [x] 导航与首页入口加「愿望」；proxy 门禁覆盖 `/wishes`；e2e 冒烟补门禁用例
+- [x] 单测：愿望 schema / 更新映射、本地日期工具
 
 ### Phase 8
 - [x] **部署区域：新加坡**（Decision 016）— `vercel.json` `regions: ["sin1"]`；文档要求 Supabase 为 Southeast Asia (Singapore)

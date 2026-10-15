@@ -210,6 +210,31 @@ export type Database = {
         };
         Update: Partial<Database["public"]["Tables"]["letter_replies"]["Insert"]>;
       };
+      wishes: {
+        Row: {
+          id: string;
+          owner_id: string;
+          title: string;
+          note: string | null;
+          author: "owner" | "partner";
+          status: "wish" | "done";
+          done_on: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          owner_id: string;
+          title: string;
+          note?: string | null;
+          author: "owner" | "partner";
+          status?: "wish" | "done";
+          done_on?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["wishes"]["Insert"]>;
+      };
     };
   };
 };
