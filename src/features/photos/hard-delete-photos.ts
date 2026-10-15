@@ -8,15 +8,19 @@ export function partitionUnreferencedPhotoIds(
   return candidateIds.filter((id) => !referencedIds.has(id));
 }
 
+/** Photos still used by a memory event or a moment (流光) must never be hard-deleted. */
 export async function findUnreferencedPhotoIds(photoIds: string[]): Promise<string[]> {
   if (photoIds.length === 0) return [];
   const supabase = createServiceClient();
-  const { data, error } = await supabase
-    .from("event_photos")
-    .select("photo_id")
-    .in("photo_id", photoIds);
-  if (error) throw new Error(error.message);
-  const referenced = new Set((data ?? []).map((row) => row.photo_id));
+  const [eventLinks, momentLinks] = await Promise.all([
+    supabase.from("event_photos").select("photo_id").in("photo_id", photoIds),
+    supabase.from("moments").select("photo_id").in("photo_id", photoIds),
+  ]);
+  if (eventLinks.error) throw new Error(eventLinks.error.message);
+  if (momentLinks.error) throw new Error(momentLinks.error.message);
+  const referenced = new Set(
+    [...(eventLinks.data ?? []), ...(momentLinks.data ?? [])].map((row) => row.photo_id),
+  );
   return partitionUnreferencedPhotoIds(photoIds, referenced);
 }
 

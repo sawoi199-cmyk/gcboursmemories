@@ -1,5 +1,4 @@
 import { unstable_cache, revalidatePath, revalidateTag } from "next/cache";
-import { appConfig } from "@/config/app";
 import {
   CHAPTER_IDS,
   type ChapterId,
@@ -7,6 +6,7 @@ import {
 } from "@/config/chapters";
 import { tryGetSiteOwnerId } from "@/lib/config/site-owner";
 import { createServiceClient } from "@/lib/supabase/admin";
+import { signThumbnailsBatch } from "@/lib/supabase/sign-thumbnails";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import type { EventPhoto, MemoryEvent, MemoryStatus } from "@/types/memory";
 
@@ -102,26 +102,6 @@ export function pickCoverLink(links: PhotoLinkRow[]): PhotoLinkRow | null {
   if (links.length === 0) return null;
   const cover = links.find((link) => link.role === "cover");
   return cover ?? links[0] ?? null;
-}
-
-async function signThumbnailsBatch(
-  supabase: ServiceClient,
-  paths: string[],
-): Promise<Map<string, string>> {
-  const unique = [...new Set(paths.filter(Boolean))];
-  const signedByPath = new Map<string, string>();
-  if (unique.length === 0) return signedByPath;
-
-  const { data } = await supabase.storage
-    .from("memory-thumbnails")
-    .createSignedUrls(unique, appConfig.signedUrlTtlSeconds);
-
-  for (const item of data ?? []) {
-    if (item.path && item.signedUrl) {
-      signedByPath.set(item.path, item.signedUrl);
-    }
-  }
-  return signedByPath;
 }
 
 function emptyHomeStats(): HomeStats {

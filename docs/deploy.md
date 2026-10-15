@@ -23,6 +23,7 @@ Region must be **Southeast Asia (Singapore)** (`ap-southeast-1`), same as Vercel
    - `supabase/migrations/20260804210000_relationship_start_date.sql`
    - `supabase/migrations/20260809110000_letter_replies.sql`
    - `supabase/migrations/20261015000000_wishes.sql`
+   - `supabase/migrations/20261016000000_moments.sql`
 3. Create the admin Auth user (email/password) if you still need it for seeding or recovery — **daily access no longer requires Auth login**.
 4. Note the admin user's UUID; it becomes `SITE_OWNER_ID` (must match `relationship_settings.owner_id` for existing data).
 5. Ensure Storage bucket `memory-thumbnails` exists and is **private** (created by init migration / policies).

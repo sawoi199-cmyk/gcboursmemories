@@ -35,6 +35,9 @@ describe("UpdateWishSchema", () => {
     expect(UpdateWishSchema.safeParse({ status: "done", doneOn: "2026/10/15" }).success).toBe(
       false,
     );
+    expect(UpdateWishSchema.safeParse({ status: "done", doneOn: "2026-02-30" }).success).toBe(
+      false,
+    );
   });
 
   it("rejects an empty update", () => {
@@ -49,10 +52,10 @@ describe("toWishRowUpdate", () => {
     expect(toWishRowUpdate(input)).toEqual({ status: "done", done_on: "2026-10-15" });
   });
 
-  it("clears done_on when reverting to a wish", () => {
+  it("clears done_on and the moment link when reverting to a wish", () => {
     const input = UpdateWishSchema.parse({ status: "wish" });
 
-    expect(toWishRowUpdate(input)).toEqual({ status: "wish", done_on: null });
+    expect(toWishRowUpdate(input)).toEqual({ status: "wish", done_on: null, moment_id: null });
   });
 
   it("leaves status untouched for text edits", () => {

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BookOpen, CalendarDays, Mail, Sparkles } from "lucide-react";
+import { Aperture, BookOpen, CalendarDays, Mail, Sparkles } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 const entries: {
@@ -21,6 +21,12 @@ const entries: {
     icon: CalendarDays,
   },
   {
+    href: "/moments",
+    title: "流光",
+    description: "一张照片，一句话",
+    icon: Aperture,
+  },
+  {
     href: "/wishes",
     title: "愿望",
     description: "想一起做的事",
@@ -36,7 +42,7 @@ const entries: {
 
 export function HomeEntries() {
   return (
-    <nav aria-label="开始探索" className="grid grid-cols-4 gap-2 sm:gap-3">
+    <nav aria-label="开始探索" className="grid grid-cols-5 gap-1.5 sm:gap-3">
       {entries.map((entry) => {
         const Icon = entry.icon;
         return (

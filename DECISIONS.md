@@ -222,3 +222,16 @@ Consequences:
 - 部署前需执行 `20261015000000_wishes.sql`。
 - 许愿日期按浏览者本地时区在客户端渲染，避免服务端 UTC 造成的水合不一致。
 - 删除不可撤销（有确认框）。
+
+## Decision 020
+
+Date: 2026-10-16
+Status: Accepted
+Context: 想要像 Instagram 一样随手记「一张照片 + 一句话」，比故事/时间线轻得多；并希望实现的愿望能连到那天的照片。
+Decision: 新增 `moments` 表（`photo_id` 唯一、`caption` ≤140、`taken_on`、`author`、`seq` identity 作发布顺序）。前台 `/moments` 直接发布与浏览（同 Decision 019 的写入模式），不走草稿/发布、不用 AI。照片复用 Decision 001/005 链路：`POST /api/moments` 一次 multipart 完成上传 + 建行，建行失败即硬清理刚上传的照片；关联愿望时先校验愿望（存在、已实现、未关联）再上传。排序 `taken_on desc, seq desc`，游标分页每页 30。`wishes.moment_id` 外键 `on delete set null` + 部分唯一索引（一愿望一流光）；撤回愿望清空关联，流光保留。`moments.photo_id` 用 `on delete restrict`，`findUnreferencedPhotoIds` 同时检查 `event_photos` 与 `moments`。流光独立成页，不进时间线/日历，也不计入首页「照片」统计（该统计仍只算已发布回忆）。
+Reason: 轻量且可回溯；一次请求避免前端两步失败留下孤儿照片；引用检查放在统一入口，所有硬删除路径都受保护。
+Consequences:
+- 部署前需执行 `20261016000000_moments.sql`。
+- 删除流光会硬删原图与缩略图（Drive 回收站可短时找回）。
+- 发流光弹窗通过 portal 挂到 `body`，避免被体验页内容层的层叠上下文压在导航下面。
+- 本地 dev 若页面像是旧代码，先注销浏览器里的 PWA Service Worker（`/_next/static` 在 dev 下文件名不带 hash，会被 cache-first 命中旧包）；线上不受影响。

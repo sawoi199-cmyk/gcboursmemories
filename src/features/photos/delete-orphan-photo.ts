@@ -21,7 +21,7 @@ export async function deleteOrphanPhoto(input: {
 
   const stillLinked = await findUnreferencedPhotoIds([input.photoId]);
   if (stillLinked.length === 0) {
-    throw new Error("Photo is still linked to an event");
+    throw new Error("Photo is still linked to an event or moment");
   }
 
   const cleanup = await hardDeletePhotos(input.ownerId, [input.photoId]);

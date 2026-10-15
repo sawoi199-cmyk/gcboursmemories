@@ -7,14 +7,19 @@ import { getWishBoard } from "@/features/wishes/wishes";
 
 export const dynamic = "force-dynamic";
 
-export default async function WishesPage() {
-  const board = await getWishBoard();
+type WishesPageProps = {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+};
+
+export default async function WishesPage({ searchParams }: WishesPageProps) {
+  const [board, query] = await Promise.all([getWishBoard(), searchParams]);
 
   return (
     <WishBoard
       initialWishes={board?.wishes ?? []}
       names={board?.names ?? { owner: DEFAULT_OWNER_NAME, partner: DEFAULT_PARTNER_NAME }}
       canEdit={board !== null}
+      initialTab={query.tab === "done" ? "done" : "wish"}
     />
   );
 }

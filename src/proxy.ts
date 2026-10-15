@@ -7,7 +7,7 @@ import {
 
 function isExperiencePath(pathname: string) {
   if (pathname === "/unlock") return false;
-  const prefixes = ["/", "/story", "/timeline", "/letter", "/memory", "/today", "/wishes"];
+  const prefixes = ["/", "/story", "/timeline", "/letter", "/memory", "/today", "/wishes", "/moments"];
   return prefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
 }
 
@@ -84,6 +84,8 @@ export const config = {
     "/today/:path*",
     "/wishes",
     "/wishes/:path*",
+    "/moments",
+    "/moments/:path*",
     "/unlock",
   ],
 };

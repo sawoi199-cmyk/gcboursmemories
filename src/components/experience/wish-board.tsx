@@ -1,7 +1,15 @@
 "use client";
 
-import { useMemo, useState, useSyncExternalStore } from "react";
-import { Check, Pencil, RotateCcw, Trash2 } from "lucide-react";
+import Link from "next/link";
+import { useMemo, useState } from "react";
+import { Check, ImagePlus, Pencil, RotateCcw, Trash2 } from "lucide-react";
+import {
+  AuthorToggle,
+  authorName,
+  useIsClient,
+  useRememberedAuthor,
+} from "@/components/experience/author-toggle";
+import { MomentComposer } from "@/components/experience/moment-composer";
 import { FadeIn } from "@/components/motion/fade-in";
 import { buttonVariants } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/status-blocks";
@@ -16,43 +24,16 @@ import type { Wish } from "@/features/wishes/wishes";
 import { cn } from "@/lib/utils";
 import { formatDottedDate, todayLocalIsoDate } from "@/lib/utils/date";
 
-const AUTHOR_STORAGE_KEY = "ours.author";
-
-type Tab = "wish" | "done";
+export type WishTab = "wish" | "done";
 
 type WishBoardProps = {
   initialWishes: Wish[];
   names: CoupleNames;
   canEdit: boolean;
+  initialTab?: WishTab;
 };
 
-function readStoredAuthor(): WishAuthor | null {
-  try {
-    const value = window.localStorage.getItem(AUTHOR_STORAGE_KEY);
-    return value === "owner" || value === "partner" ? value : null;
-  } catch {
-    return null;
-  }
-}
-
-function storeAuthor(author: WishAuthor) {
-  try {
-    window.localStorage.setItem(AUTHOR_STORAGE_KEY, author);
-  } catch {
-    // Remembering the author is a convenience only.
-  }
-}
-
-const subscribeNever = () => () => {};
-
-/** False during SSR/hydration, true afterwards — for viewer-timezone dates. */
-function useIsClient() {
-  return useSyncExternalStore(
-    subscribeNever,
-    () => true,
-    () => false,
-  );
-}
+type WishResult = { ok: true; data: Wish } | { ok: false; message: string };
 
 function sortWishes(wishes: Wish[]) {
   return [...wishes].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
@@ -65,21 +46,16 @@ function sortDone(wishes: Wish[]) {
   );
 }
 
-export function WishBoard({ initialWishes, names, canEdit }: WishBoardProps) {
+export function WishBoard({ initialWishes, names, canEdit, initialTab = "wish" }: WishBoardProps) {
   const [wishes, setWishes] = useState(initialWishes);
-  const [tab, setTab] = useState<Tab>("wish");
-  const storedAuthor = useSyncExternalStore(subscribeNever, readStoredAuthor, () => null);
-  const [chosenAuthor, setChosenAuthor] = useState<WishAuthor | null>(null);
-  const author = chosenAuthor ?? storedAuthor ?? "partner";
+  const [tab, setTab] = useState<WishTab>(initialTab);
+  const [author, chooseAuthor] = useRememberedAuthor();
+  const [rememberFor, setRememberFor] = useState<Wish | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const pending = useMemo(() => sortWishes(wishes.filter((w) => w.status === "wish")), [wishes]);
   const done = useMemo(() => sortDone(wishes.filter((w) => w.status === "done")), [wishes]);
   const visible = tab === "wish" ? pending : done;
-
-  function chooseAuthor(next: WishAuthor) {
-    setChosenAuthor(next);
-    storeAuthor(next);
-  }
 
   function upsert(wish: Wish) {
     setWishes((current) => {
@@ -123,6 +99,8 @@ export function WishBoard({ initialWishes, names, canEdit }: WishBoardProps) {
         </TabButton>
       </div>
 
+      {notice ? <p className="mt-4 text-sm text-accent-ours">{notice}</p> : null}
+
       {visible.length === 0 ? (
         <EmptyState
           className="mt-8"
@@ -143,10 +121,34 @@ export function WishBoard({ initialWishes, names, canEdit }: WishBoardProps) {
               canEdit={canEdit}
               onChange={upsert}
               onDelete={drop}
+              onRemember={(target) => {
+                setNotice(null);
+                setRememberFor(target);
+              }}
             />
           ))}
         </ul>
       )}
+
+      {rememberFor ? (
+        <MomentComposer
+          names={names}
+          title="为这个愿望留一条流光"
+          initialCaption={rememberFor.title}
+          initialTakenOn={rememberFor.doneOn ?? undefined}
+          wishId={rememberFor.id}
+          onClose={() => setRememberFor(null)}
+          onCreated={(moment, warnings) => {
+            setRememberFor(null);
+            if (warnings.length > 0) {
+              setNotice(warnings.join(" "));
+              return;
+            }
+            upsert({ ...rememberFor, moment: { id: moment.id, thumbnailUrl: moment.thumbnailUrl } });
+            setTab("done");
+          }}
+        />
+      ) : null}
     </section>
   );
 }
@@ -173,44 +175,6 @@ function TabButton({
     >
       {children}
     </button>
-  );
-}
-
-function AuthorToggle({
-  author,
-  names,
-  onChange,
-}: {
-  author: WishAuthor;
-  names: CoupleNames;
-  onChange: (author: WishAuthor) => void;
-}) {
-  const options: { value: WishAuthor; label: string }[] = [
-    { value: "partner", label: names.partner },
-    { value: "owner", label: names.owner },
-  ];
-
-  return (
-    <div role="radiogroup" aria-label="我是" className="flex items-center gap-1.5 text-xs">
-      <span className="mr-1 text-muted-ours">我是</span>
-      {options.map((option) => (
-        <button
-          key={option.value}
-          type="button"
-          role="radio"
-          aria-checked={author === option.value}
-          onClick={() => onChange(option.value)}
-          className={cn(
-            "rounded-full border px-3 py-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50",
-            author === option.value
-              ? "border-gold bg-gold/15 text-ink"
-              : "border-line text-muted-ours hover:text-ink",
-          )}
-        >
-          {option.label}
-        </button>
-      ))}
-    </div>
   );
 }
 
@@ -309,12 +273,14 @@ function WishItem({
   canEdit,
   onChange,
   onDelete,
+  onRemember,
 }: {
   wish: Wish;
   names: CoupleNames;
   canEdit: boolean;
   onChange: (wish: Wish) => void;
   onDelete: (id: string) => void;
+  onRemember: (wish: Wish) => void;
 }) {
   const [mode, setMode] = useState<"view" | "complete" | "edit">("view");
   const [doneOn, setDoneOn] = useState(() => todayLocalIsoDate());
@@ -322,22 +288,37 @@ function WishItem({
   const [note, setNote] = useState(wish.note ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
   const isClient = useIsClient();
-  const authorName = wish.author === "owner" ? names.owner : names.partner;
+
   const isDone = wish.status === "done";
 
-  async function run(action: () => Promise<{ ok: true; data: Wish } | { ok: false; message: string }>) {
+  async function run(action: () => Promise<WishResult>): Promise<Wish | null> {
     setBusy(true);
     setError(null);
     const result = await action();
     setBusy(false);
     if (!result.ok) {
       setError(result.message);
-      return;
+      return null;
     }
     setMode("view");
     onChange(result.data);
+    return result.data;
+  }
+
+  async function complete(withMoment: boolean) {
+    const updated = await run(() => patchWish(wish.id, { status: "done", doneOn }));
+    if (updated && withMoment) onRemember(updated);
+  }
+
+  async function revert() {
+    if (
+      wish.moment &&
+      !window.confirm("撤回后，这个愿望和流光的关联会解除（流光本身会保留）。继续吗？")
+    ) {
+      return;
+    }
+    await run(() => patchWish(wish.id, { status: "wish" }));
   }
 
   async function onRemove() {
@@ -360,7 +341,7 @@ function WishItem({
   }
 
   return (
-    <li className="py-5">
+    <li id={`wish-${wish.id}`} className="scroll-mt-24 py-5">
       {mode === "edit" ? (
         <form
           onSubmit={(event) => {
@@ -425,43 +406,79 @@ function WishItem({
               </p>
             ) : null}
             <p className="mt-1.5 text-xs text-muted-ours">
-              {authorName}
+              {authorName(wish.author, names)}
               {isClient ? ` · ${formatDottedDate(todayLocalIsoDate(new Date(wish.createdAt)))}` : ""} 许愿
               {isDone && wish.doneOn ? (
                 <span className="whitespace-nowrap text-gold"> · {formatDottedDate(wish.doneOn)} 实现</span>
               ) : null}
             </p>
 
+            {isDone && wish.moment ? (
+              <Link
+                href={`/moments/${wish.moment.id}`}
+                className="group mt-3 inline-flex items-center gap-3 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50"
+              >
+                <span className="relative block size-14 shrink-0 overflow-hidden rounded-lg bg-paper bg-[linear-gradient(135deg,#efe4d6,#f7efe6)]">
+                  {wish.moment.thumbnailUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={wish.moment.thumbnailUrl}
+                      alt={`「${wish.title}」那天的流光`}
+                      className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                    />
+                  ) : null}
+                </span>
+                <span className="text-xs text-muted-ours group-hover:text-ink">那天的流光 →</span>
+              </Link>
+            ) : null}
+
             {mode === "complete" ? (
               <form
                 onSubmit={(event) => {
                   event.preventDefault();
-                  void run(() => patchWish(wish.id, { status: "done", doneOn }));
+                  void complete(false);
                 }}
-                className="mt-3 flex flex-wrap items-center gap-2"
+                className="mt-3 space-y-2"
               >
-                <label htmlFor={`done-on-${wish.id}`} className="text-xs text-muted-ours">
-                  实现日期
-                </label>
-                <input
-                  id={`done-on-${wish.id}`}
-                  type="date"
-                  value={doneOn}
-                  max={todayLocalIsoDate()}
-                  onChange={(event) => setDoneOn(event.target.value)}
-                  required
-                  className="rounded-lg border border-line bg-background px-2 py-1 text-sm text-ink outline-none focus:border-gold"
-                />
-                <button type="submit" disabled={busy || !doneOn} className={buttonVariants({ size: "sm" })}>
-                  {busy ? "保存中…" : "确认"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setMode("view")}
-                  className={buttonVariants({ size: "sm", variant: "ghost" })}
-                >
-                  取消
-                </button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <label htmlFor={`done-on-${wish.id}`} className="text-xs text-muted-ours">
+                    实现日期
+                  </label>
+                  <input
+                    id={`done-on-${wish.id}`}
+                    type="date"
+                    value={doneOn}
+                    max={todayLocalIsoDate()}
+                    onChange={(event) => setDoneOn(event.target.value)}
+                    required
+                    className="rounded-lg border border-line bg-background px-2 py-1 text-sm text-ink outline-none focus:border-gold"
+                  />
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={busy || !doneOn}
+                    onClick={() => void complete(true)}
+                    className={cn(buttonVariants({ size: "sm" }), "gap-1")}
+                  >
+                    <ImagePlus aria-hidden />
+                    实现了，发一条流光
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={busy || !doneOn}
+                    className={buttonVariants({ size: "sm", variant: "outline" })}
+                  >
+                    {busy ? "保存中…" : "只打勾"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMode("view")}
+                    className={buttonVariants({ size: "sm", variant: "ghost" })}
+                  >
+                    取消
+                  </button>
+                </div>
               </form>
             ) : null}
 
@@ -471,13 +488,16 @@ function WishItem({
           {canEdit && mode === "view" ? (
             <div className="flex shrink-0 items-center gap-0.5">
               {isDone ? (
-                <IconAction
-                  label="撤回为未实现"
-                  disabled={busy}
-                  onClick={() => void run(() => patchWish(wish.id, { status: "wish" }))}
-                >
-                  <RotateCcw />
-                </IconAction>
+                <>
+                  {!wish.moment ? (
+                    <IconAction label="补一条流光" disabled={busy} onClick={() => onRemember(wish)}>
+                      <ImagePlus />
+                    </IconAction>
+                  ) : null}
+                  <IconAction label="撤回为未实现" disabled={busy} onClick={() => void revert()}>
+                    <RotateCcw />
+                  </IconAction>
+                </>
               ) : (
                 <button
                   type="button"

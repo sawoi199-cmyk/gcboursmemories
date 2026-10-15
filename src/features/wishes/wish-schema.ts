@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { IsoDateSchema } from "@/lib/utils/iso-date";
 
 export const WISH_TITLE_MAX = 60;
 export const WISH_NOTE_MAX = 300;
@@ -8,11 +9,6 @@ export type WishAuthor = z.infer<typeof WishAuthorSchema>;
 
 export const WishStatusSchema = z.enum(["wish", "done"]);
 export type WishStatus = z.infer<typeof WishStatusSchema>;
-
-const IsoDateSchema = z
-  .string()
-  .regex(/^\d{4}-\d{2}-\d{2}$/)
-  .refine((value) => !Number.isNaN(Date.parse(`${value}T00:00:00Z`)), "Invalid date");
 
 const TitleSchema = z.string().trim().min(1).max(WISH_TITLE_MAX);
 
@@ -58,6 +54,7 @@ export type WishRowUpdate = {
   author?: WishAuthor;
   status?: WishStatus;
   done_on?: string | null;
+  moment_id?: null;
 };
 
 /** Map a validated PATCH body to DB columns, keeping status and done_on in sync. */
@@ -72,6 +69,8 @@ export function toWishRowUpdate(input: UpdateWishInput): WishRowUpdate {
   } else if (input.status === "wish") {
     update.status = "wish";
     update.done_on = null;
+    // A reverted wish is no longer "fulfilled" by its moment; the moment itself stays.
+    update.moment_id = null;
   }
   return update;
 }

@@ -17,6 +17,11 @@ test.describe("OURS smoke", () => {
     await expect(page).toHaveURL(/\/unlock/);
   });
 
+  test("moments require site unlock", async ({ page }) => {
+    await page.goto("/moments");
+    await expect(page).toHaveURL(/\/unlock/);
+  });
+
   test("studio requires site unlock", async ({ page }) => {
     await page.goto("/studio");
     await expect(page).toHaveURL(/\/unlock/);

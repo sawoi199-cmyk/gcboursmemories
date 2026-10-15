@@ -1,16 +1,24 @@
 # Current Phase
 
-Phase 9a — 愿望清单（已实现；需在 Supabase 执行 `20261015000000_wishes.sql`）
+Phase 9b — 流光 + 愿望关联（已实现；需在 Supabase 执行 `20261016000000_moments.sql`）
 
 ## Todo
 
-- [ ] 在 Supabase SQL Editor 执行 `supabase/migrations/20261015000000_wishes.sql`，然后上线验证 `/wishes`
-- [ ] Phase 9b 流光（一张照片 + 一句话；开始前确认愿望是否关联流光）
+- [ ] 在 Supabase SQL Editor 执行 `supabase/migrations/20261016000000_moments.sql`，然后上线验证 `/moments` 与愿望关联
 - [ ] 按 `docs/deploy.md` 配置 Vercel 生产环境变量（含 `SITE_OWNER_ID`、可选 `SITE_BOOTSTRAP_PASSWORD`）并首次部署
 - [ ] 按 `docs/privacy-checklist.md` 勾一遍
 - [ ] 微调体验（用户后续提）
 
 ## Completed
+
+### Phase 9b 流光 + 愿望关联（Decision 020）
+- [x] `moments` 表 migration（一张照片 + 一句话 ≤140、日期、作者、`seq` 发布顺序）；`wishes.moment_id`（一愿望一流光）
+- [x] `GET/POST /api/moments`（游标分页 / multipart 发布，复用 GAS 原图 + 缩略图链路）、`PATCH/DELETE /api/moments/[id]`
+- [x] 前台 `/moments` 三列方格 + 无限滚动 + 「发一条」弹窗；`/moments/[id]` 大图（可看原图）、编辑、删除
+- [x] 愿望关联：「实现了，发一条流光」/「补一条流光」、已实现卡片显示流光缩略图、流光页「✓ 实现了愿望」标签回跳；撤回愿望解除关联
+- [x] 照片硬清理引用检查纳入 `moments`，避免误删流光照片（含 `DELETE /api/photos/[id]`）
+- [x] 抽出共享 `signThumbnailsBatch` / `IsoDateSchema` / 作者选择组件；导航与首页入口加「流光」；e2e 门禁用例
+- [x] 单测：流光 schema/游标、创建流程（先校验愿望、失败清理照片）、引用检查
 
 ### Phase 9a 愿望清单（Decision 019）
 - [x] `wishes` 表 migration（标题 ≤60、备注 ≤300、作者 owner/partner、状态 wish/done + 实现日期一致性约束）
@@ -18,6 +26,7 @@ Phase 9a — 愿望清单（已实现；需在 Supabase 执行 `20261015000000_w
 - [x] 前台 `/wishes`：快速许愿、「我是 乖宝/臭宝」记住上次选择、想做的/已实现分组、实现日期、撤回、编辑、删除确认
 - [x] 导航与首页入口加「愿望」；proxy 门禁覆盖 `/wishes`；e2e 冒烟补门禁用例
 - [x] 单测：愿望 schema / 更新映射、本地日期工具
+- [x] 已在生产 Supabase 执行 `20261015000000_wishes.sql`
 
 ### Phase 8
 - [x] **部署区域：新加坡**（Decision 016）— `vercel.json` `regions: ["sin1"]`；文档要求 Supabase 为 Southeast Asia (Singapore)

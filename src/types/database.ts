@@ -219,6 +219,7 @@ export type Database = {
           author: "owner" | "partner";
           status: "wish" | "done";
           done_on: string | null;
+          moment_id: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -230,10 +231,35 @@ export type Database = {
           author: "owner" | "partner";
           status?: "wish" | "done";
           done_on?: string | null;
+          moment_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["wishes"]["Insert"]>;
+      };
+      moments: {
+        Row: {
+          id: string;
+          seq: number;
+          owner_id: string;
+          photo_id: string;
+          caption: string;
+          taken_on: string;
+          author: "owner" | "partner";
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          owner_id: string;
+          photo_id: string;
+          caption: string;
+          taken_on: string;
+          author: "owner" | "partner";
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["moments"]["Insert"]>;
       };
     };
   };
