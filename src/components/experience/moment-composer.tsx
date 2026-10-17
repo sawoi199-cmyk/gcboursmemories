@@ -19,11 +19,14 @@ import {
   STICKER_SCALE_MAX,
   STICKER_SCALE_MIN,
   TEMPLATE_LABELS,
+  TEXT_SCALE_MAX,
+  TEXT_SCALE_MIN,
   TEXT_STYLES,
   TEXT_STYLE_LABELS,
   clampFraction,
   defaultLayout,
   textFor,
+  textScaleOf,
   type DecoSticker,
   type MomentLayout,
   type MomentSticker,
@@ -539,7 +542,18 @@ export function MomentComposer({
             ) : null}
 
             {tool === "text" ? (
-              <div className="mt-3">
+              <div className="mt-3 space-y-3">
+                <div className="rounded-xl bg-paper px-4 py-2">
+                  <RangeRow
+                    label="字号"
+                    min={TEXT_SCALE_MIN}
+                    max={TEXT_SCALE_MAX}
+                    step={0.05}
+                    value={textScaleOf(layout)}
+                    onChange={(textScale) => setLayout((current) => ({ ...current, textScale }))}
+                    suffix={`${Math.round(textScaleOf(layout) * 100)}%`}
+                  />
+                </div>
                 {canFloatText && floatingText ? (
                   <>
                     <p className="text-xs text-muted-ours">拖动照片上的文字来摆位置；选中文字后可以旋转。</p>
@@ -627,6 +641,7 @@ function RangeRow({
   step,
   value,
   onChange,
+  suffix,
 }: {
   label: string;
   min: number;
@@ -634,6 +649,7 @@ function RangeRow({
   step: number;
   value: number;
   onChange: (value: number) => void;
+  suffix?: string;
 }) {
   return (
     <label className="flex items-center gap-3 text-xs text-muted-ours">
@@ -647,6 +663,7 @@ function RangeRow({
         onChange={(event) => onChange(Number(event.target.value))}
         className="flex-1 accent-[#b8955a]"
       />
+      {suffix ? <span className="w-10 shrink-0 text-right tabular-nums">{suffix}</span> : null}
     </label>
   );
 }

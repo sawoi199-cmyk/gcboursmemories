@@ -1,5 +1,7 @@
 import type { MomentCursor, UpdateMomentInput } from "@/features/moments/moment-schema";
+import type { MomentComment } from "@/features/moments/moment-social";
 import type { MomentDetail, MomentsPage } from "@/features/moments/moments";
+import type { WishAuthor } from "@/features/wishes/wish-schema";
 
 export type MomentApiResult<T> = { ok: true; data: T } | { ok: false; message: string };
 
@@ -10,6 +12,8 @@ type MomentResponse = {
   warnings?: string[];
   moments?: MomentsPage["moments"];
   nextCursor?: MomentCursor | null;
+  comment?: MomentComment;
+  likedBy?: WishAuthor[];
 };
 
 async function request(url: string, init?: RequestInit): Promise<MomentApiResult<MomentResponse>> {
@@ -62,4 +66,36 @@ export async function patchMoment(
 export async function removeMoment(id: string): Promise<MomentApiResult<null>> {
   const result = await request(`/api/moments/${id}`, { method: "DELETE" });
   return result.ok ? { ok: true, data: null } : result;
+}
+
+export async function postComment(
+  momentId: string,
+  input: { author: WishAuthor; body: string },
+): Promise<MomentApiResult<MomentComment>> {
+  const result = await request(`/api/moments/${momentId}/comments`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!result.ok) return result;
+  if (!result.data.comment) return { ok: false, message: "评论失败，请稍后重试。" };
+  return { ok: true, data: result.data.comment };
+}
+
+export async function removeComment(momentId: string, commentId: string): Promise<MomentApiResult<null>> {
+  const result = await request(`/api/moments/${momentId}/comments/${commentId}`, { method: "DELETE" });
+  return result.ok ? { ok: true, data: null } : result;
+}
+
+export async function putLike(
+  momentId: string,
+  input: { author: WishAuthor; liked: boolean },
+): Promise<MomentApiResult<WishAuthor[]>> {
+  const result = await request(`/api/moments/${momentId}/likes`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!result.ok) return result;
+  return { ok: true, data: result.data.likedBy ?? [] };
 }

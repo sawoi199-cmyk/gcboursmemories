@@ -6,6 +6,7 @@ import {
   MomentLayoutSchema,
   parseMomentLayout,
   textFor,
+  textScaleOf,
 } from "@/features/moments/moment-layout";
 
 const sticker = {
@@ -46,6 +47,15 @@ describe("MomentLayoutSchema", () => {
         stickers: Array.from({ length: MAX_STICKERS + 1 }, (_, i) => ({ ...sticker, id: `s${i}` })),
       }).success,
     ).toBe(false);
+  });
+});
+
+describe("textScale", () => {
+  it("accepts a caption size multiplier within range and defaults to 1", () => {
+    expect(MomentLayoutSchema.safeParse({ template: "simple", textScale: 1.4, stickers: [] }).success).toBe(true);
+    expect(MomentLayoutSchema.safeParse({ template: "simple", textScale: 2, stickers: [] }).success).toBe(false);
+    expect(MomentLayoutSchema.safeParse({ template: "simple", textScale: 0.5, stickers: [] }).success).toBe(false);
+    expect(textScaleOf({ template: "simple", stickers: [] })).toBe(1);
   });
 });
 

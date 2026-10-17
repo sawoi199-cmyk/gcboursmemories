@@ -2,6 +2,7 @@ import type { CSSProperties, PointerEvent as ReactPointerEvent } from "react";
 import { DECO_RATIO, DECO_WIDTH, DecoArt } from "@/components/moments/moment-decos";
 import {
   textFor,
+  textScaleOf,
   type MomentLayout,
   type MomentSticker,
   type MomentTextStyle,
@@ -27,9 +28,16 @@ type MomentCardProps = {
   className?: string;
 };
 
-// Card typography scales with the card (container query units) but never drops
-// below a readable size on small grid tiles.
-const captionSize = "clamp(11px, 5.2cqw, 21px)";
+// Card typography scales with the card (container query units) and the moment's own
+// textScale, but never drops below a readable size on small grid tiles.
+function fluidSize(minPx: number, cqw: number, maxPx: number, scale: number) {
+  const min = Math.max(10, Math.round(minPx * scale));
+  return `clamp(${min}px, ${(cqw * scale).toFixed(2)}cqw, ${Math.round(maxPx * scale)}px)`;
+}
+
+function captionSizeFor(scale: number) {
+  return fluidSize(11, 5.2, 21, scale);
+}
 const metaSize = "clamp(10px, 3cqw, 12px)";
 
 const TEXT_STYLE_CLASSES: Record<MomentTextStyle, string> = {
@@ -155,6 +163,7 @@ function FloatingCaption({
 }) {
   const text = textFor(layout);
   if (!text) return null;
+  const scale = textScaleOf(layout);
   const props = interactiveProps(interaction, CAPTION_TARGET);
   const position: CSSProperties = {
     left: `${text.x * 100}%`,
@@ -176,7 +185,7 @@ function FloatingCaption({
             "font-serif",
             text.style === "dark" ? "text-[#1f1a17]" : "text-white [text-shadow:0_0.4cqw_1.6cqw_rgba(0,0,0,0.5)]",
           )}
-          style={{ fontSize: "clamp(14px, 8.4cqw, 34px)", lineHeight: 1.15 }}
+          style={{ fontSize: fluidSize(14, 8.4, 34, scale), lineHeight: 1.15 }}
         />
         <span className="sr-only">{formatDottedDate(takenOn)}</span>
       </div>
@@ -195,7 +204,7 @@ function FloatingCaption({
         lines={5}
         className={cn("text-center font-serif", TEXT_STYLE_CLASSES[text.style])}
         style={{
-          fontSize: captionSize,
+          fontSize: captionSizeFor(scale),
           lineHeight: 1.35,
           padding: "1.3cqw 3cqw",
           borderRadius: "1.6cqw",
@@ -211,6 +220,9 @@ function FloatingCaption({
  */
 export function MomentCard({ photoUrl, caption, takenOn, layout, interaction, className }: MomentCardProps) {
   const date = formatDottedDate(takenOn);
+  const captionSize = captionSizeFor(textScaleOf(layout));
+  // Ruled-paper spacing of the note template follows the caption size.
+  const noteRule = `${(7 * textScaleOf(layout)).toFixed(2)}cqw`;
 
   return (
     <div
@@ -269,10 +281,10 @@ export function MomentCard({ photoUrl, caption, takenOn, layout, interaction, cl
             <DecoArt value="tape-yellow" takenOn={takenOn} />
           </div>
           <div
-            className="absolute bg-[repeating-linear-gradient(transparent_0,transparent_calc(7cqw-1px),rgba(140,110,40,0.18)_calc(7cqw-1px),rgba(140,110,40,0.18)_7cqw)]"
-            style={{ left: "8cqw", right: "8cqw", top: "84cqw", bottom: "5cqw" }}
+            className="absolute bg-[repeating-linear-gradient(transparent_0,transparent_calc(var(--rule)-1px),rgba(140,110,40,0.18)_calc(var(--rule)-1px),rgba(140,110,40,0.18)_var(--rule))]"
+            style={{ left: "8cqw", right: "8cqw", top: "84cqw", bottom: "5cqw", ["--rule" as string]: noteRule }}
           >
-            <Caption caption={caption} lines={3} className="font-serif text-[#4a3b22]" style={{ fontSize: captionSize, lineHeight: "7cqw" }} />
+            <Caption caption={caption} lines={3} className="font-serif text-[#4a3b22]" style={{ fontSize: captionSize, lineHeight: noteRule }} />
           </div>
         </div>
       ) : null}

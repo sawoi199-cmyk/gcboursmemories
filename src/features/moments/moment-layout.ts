@@ -56,6 +56,8 @@ export const EMOJI_STICKERS = [
 ] as const;
 
 export const MAX_STICKERS = 24;
+export const TEXT_SCALE_MIN = 0.7;
+export const TEXT_SCALE_MAX = 1.6;
 export const STICKER_SCALE_MIN = 0.4;
 export const STICKER_SCALE_MAX = 2.5;
 
@@ -97,6 +99,8 @@ export const MomentLayoutSchema = z.object({
   template: z.enum(MOMENT_TEMPLATES),
   /** Position/style of the caption for floating-text templates; ignored by the others. */
   text: MomentTextSchema.optional(),
+  /** Caption size multiplier for every template; omitted → 1. */
+  textScale: z.number().min(TEXT_SCALE_MIN).max(TEXT_SCALE_MAX).optional(),
   stickers: z.array(MomentStickerSchema).max(MAX_STICKERS),
 });
 export type MomentLayout = z.infer<typeof MomentLayoutSchema>;
@@ -116,6 +120,10 @@ export function textFor(layout: MomentLayout): MomentText | null {
     return layout.text ?? DEFAULT_TEXT[layout.template];
   }
   return null;
+}
+
+export function textScaleOf(layout: MomentLayout) {
+  return layout.textScale ?? 1;
 }
 
 /** Tolerant read of a stored layout: anything malformed renders as the default. */

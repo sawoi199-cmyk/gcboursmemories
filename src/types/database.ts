@@ -263,6 +263,42 @@ export type Database = {
         };
         Update: Partial<Database["public"]["Tables"]["moments"]["Insert"]>;
       };
+      moment_comments: {
+        Row: {
+          id: string;
+          owner_id: string;
+          moment_id: string;
+          author: "owner" | "partner";
+          body: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          owner_id: string;
+          moment_id: string;
+          author: "owner" | "partner";
+          body: string;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["moment_comments"]["Insert"]>;
+      };
+      moment_likes: {
+        Row: {
+          id: string;
+          owner_id: string;
+          moment_id: string;
+          author: "owner" | "partner";
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          owner_id: string;
+          moment_id: string;
+          author: "owner" | "partner";
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["moment_likes"]["Insert"]>;
+      };
     };
   };
 };

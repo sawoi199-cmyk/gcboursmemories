@@ -4,6 +4,14 @@ import {
   hardDeletePhotos,
 } from "@/features/photos/hard-delete-photos";
 import { uploadPhotoForOwner } from "@/features/uploads/upload-photo";
+import { MomentRequestError } from "@/features/moments/moment-errors";
+import {
+  EMPTY_SOCIAL,
+  getSocialSummaries,
+  listComments,
+  type MomentComment,
+  type MomentSocial,
+} from "@/features/moments/moment-social";
 import {
   defaultLayout,
   parseMomentLayout,
@@ -32,7 +40,7 @@ export type MomentTile = {
   takenOn: string;
   thumbnailUrl: string | null;
   layout: MomentLayout;
-};
+} & MomentSocial;
 
 export type MomentDetail = MomentTile & {
   photoId: string;
@@ -40,6 +48,7 @@ export type MomentDetail = MomentTile & {
   width: number | null;
   height: number | null;
   wish: { id: string; title: string } | null;
+  comments: MomentComment[];
 };
 
 export type MomentsPage = {
@@ -47,15 +56,7 @@ export type MomentsPage = {
   nextCursor: MomentCursor | null;
 };
 
-/** Expected request problems mapped to an HTTP status by the API routes. */
-export class MomentRequestError extends Error {
-  constructor(
-    message: string,
-    readonly status: 400 | 404 | 409,
-  ) {
-    super(message);
-  }
-}
+export { MomentRequestError };
 
 type PhotoEmbed = { thumbnail_path: string | null; width: number | null; height: number | null };
 
@@ -88,7 +89,11 @@ async function signRows(supabase: ServiceClient, rows: MomentRow[]) {
   };
 }
 
-function toTile(row: MomentRow, thumbnailUrl: string | null): MomentTile {
+function toTile(
+  row: MomentRow,
+  thumbnailUrl: string | null,
+  social: MomentSocial = EMPTY_SOCIAL,
+): MomentTile {
   return {
     id: row.id,
     seq: row.seq,
@@ -96,6 +101,8 @@ function toTile(row: MomentRow, thumbnailUrl: string | null): MomentTile {
     takenOn: row.taken_on,
     thumbnailUrl,
     layout: parseMomentLayout(row.layout),
+    commentCount: social.commentCount,
+    likedBy: social.likedBy,
   };
 }
 
@@ -117,11 +124,18 @@ export async function listMoments(
   const rows = (data ?? []) as MomentRow[];
   const hasMore = rows.length > limit;
   const pageRows = hasMore ? rows.slice(0, limit) : rows;
-  const urlFor = await signRows(supabase, pageRows);
+  const [urlFor, social] = await Promise.all([
+    signRows(supabase, pageRows),
+    getSocialSummaries(
+      supabase,
+      ownerId,
+      pageRows.map((row) => row.id),
+    ),
+  ]);
   const last = pageRows[pageRows.length - 1];
 
   return {
-    moments: pageRows.map((row) => toTile(row, urlFor(row))),
+    moments: pageRows.map((row) => toTile(row, urlFor(row), social.get(row.id))),
     nextCursor: hasMore && last ? { takenOn: last.taken_on, seq: last.seq } : null,
   };
 }
@@ -143,7 +157,7 @@ async function loadMomentDetail(
   ownerId: string,
   id: string,
 ): Promise<MomentDetail | null> {
-  const [momentResult, wishResult] = await Promise.all([
+  const [momentResult, wishResult, social, comments] = await Promise.all([
     supabase
       .from("moments")
       .select(MOMENT_COLUMNS)
@@ -156,6 +170,8 @@ async function loadMomentDetail(
       .eq("moment_id", id)
       .eq("owner_id", ownerId)
       .maybeSingle(),
+    getSocialSummaries(supabase, ownerId, [id]),
+    listComments(supabase, ownerId, id),
   ]);
   if (momentResult.error) throw new Error(momentResult.error.message);
   if (wishResult.error) throw new Error(wishResult.error.message);
@@ -165,12 +181,13 @@ async function loadMomentDetail(
   const urlFor = await signRows(supabase, [row]);
   const photo = embeddedPhoto(row);
   return {
-    ...toTile(row, urlFor(row)),
+    ...toTile(row, urlFor(row), social.get(id)),
     photoId: row.photo_id,
     author: row.author,
     width: photo?.width ?? null,
     height: photo?.height ?? null,
     wish: wishResult.data ? { id: wishResult.data.id, title: wishResult.data.title } : null,
+    comments,
   };
 }
 

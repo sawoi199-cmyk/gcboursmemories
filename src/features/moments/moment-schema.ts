@@ -4,6 +4,7 @@ import { WishAuthorSchema } from "@/features/wishes/wish-schema";
 import { IsoDateSchema } from "@/lib/utils/iso-date";
 
 export const MOMENT_CAPTION_MAX = 140;
+export const MOMENT_COMMENT_MAX = 300;
 export const MOMENTS_PAGE_SIZE = 30;
 
 const CaptionSchema = z.string().trim().min(1).max(MOMENT_CAPTION_MAX);
@@ -30,6 +31,18 @@ export const UpdateMomentSchema = z
     message: "Nothing to update",
   });
 export type UpdateMomentInput = z.infer<typeof UpdateMomentSchema>;
+
+export const CreateCommentSchema = z.object({
+  author: WishAuthorSchema,
+  body: z.string().trim().min(1).max(MOMENT_COMMENT_MAX),
+});
+export type CreateCommentInput = z.infer<typeof CreateCommentSchema>;
+
+export const SetLikeSchema = z.object({
+  author: WishAuthorSchema,
+  liked: z.boolean(),
+});
+export type SetLikeInput = z.infer<typeof SetLikeSchema>;
 
 export type MomentCursor = {
   takenOn: string;

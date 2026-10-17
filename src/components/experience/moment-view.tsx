@@ -6,6 +6,7 @@ import { useLayoutEffect, useRef, useState } from "react";
 import { Check, Pencil, Trash2 } from "lucide-react";
 import { authorName } from "@/components/experience/author-toggle";
 import { MomentComposer } from "@/components/experience/moment-composer";
+import { MomentSocialPanel } from "@/components/experience/moment-social-panel";
 import { MomentCard } from "@/components/moments/moment-card";
 import { PhotoLightbox } from "@/components/photo-viewer/lightbox";
 import { FadeIn } from "@/components/motion/fade-in";
@@ -132,6 +133,13 @@ export function MomentView({ initialMoment, names }: MomentViewProps) {
       ) : null}
 
       {error ? <p className="mt-3 text-sm text-accent-ours">{error}</p> : null}
+
+      <MomentSocialPanel
+        momentId={moment.id}
+        initialComments={moment.comments}
+        initialLikedBy={moment.likedBy}
+        names={names}
+      />
 
       {editing ? (
         <MomentComposer

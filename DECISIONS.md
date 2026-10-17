@@ -247,3 +247,15 @@ Consequences:
 - 部署前需执行 `20261017000000_moment_layout.sql`（代码会读写 `layout` 列，先迁移再推送）。
 - emoji 在不同系统字体下外观略有差异。
 - 长句子在卡片里会被截断，详情页检测到截断时在卡片下方显示全文。
+
+## Decision 022
+
+Date: 2026-10-18
+Status: Accepted
+Context: 希望流光的字可以调大调小，并能像 IG 一样留言、点喜欢。
+Decision: 字号作为排版数据 `layout.textScale`（0.7–1.6，缺省 1）保存，`MomentCard` 用同一倍率缩放各模板的字号（便利贴横线间距随之变化），小卡最小 10px；不改表结构。评论与点赞用两张新表 `moment_comments`（作者、≤300 字）和 `moment_likes`（`unique (moment_id, author)`，每人一次），均 `on delete cascade` 跟随流光。写入沿用 Decision 019 模式（站点会话 + Service Role + `owner_id`），作者由「我是 乖宝/臭宝」选择并复用记住的选择。评论只能删、不能改，不做楼中楼；点赞接口幂等（`PUT {author, liked}`），前端乐观更新再以服务端结果为准。方格页随分页批量查询计数（两次查询），详情页加载完整评论。
+Reason: 字号随排版走，旧流光不受影响也无需迁移；两人场景下扁平评论最直观；幂等点赞避免重复点击产生脏数据。
+Consequences:
+- 部署前需执行 `20261018000000_moment_comments.sql`（代码会读评论/点赞表，先迁移再推送）。
+- 删除流光会同时删除它的评论与点赞。
+- 评论时间在客户端按浏览者本地时区渲染，避免水合不一致。

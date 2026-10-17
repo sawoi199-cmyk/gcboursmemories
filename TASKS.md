@@ -1,15 +1,23 @@
 # Current Phase
 
-Phase 9c — 流光模板与贴纸（已实现；需在 Supabase 执行 `20261017000000_moment_layout.sql`）
+Phase 9d — 流光字号、评论与点赞（已实现；需在 Supabase 执行 `20261018000000_moment_comments.sql`）
 
 ## Todo
 
-- [ ] 在 Supabase SQL Editor 执行 `supabase/migrations/20261017000000_moment_layout.sql`，然后上线验证流光模板与贴纸
+- [ ] 在 Supabase SQL Editor 执行 `supabase/migrations/20261018000000_moment_comments.sql`，然后上线验证评论、点赞与字号
 - [ ] 按 `docs/deploy.md` 配置 Vercel 生产环境变量（含 `SITE_OWNER_ID`、可选 `SITE_BOOTSTRAP_PASSWORD`）并首次部署
 - [ ] 按 `docs/privacy-checklist.md` 勾一遍
 - [ ] 微调体验（用户后续提）
 
 ## Completed
+
+### Phase 9d 流光字号、评论与点赞（Decision 022）
+- [x] 字号：`layout.textScale`（70%–160%，六种模板都生效）；编辑器「文字」工具加字号滑杆；无需迁移
+- [x] `moment_comments` / `moment_likes` migration（随流光级联删除；点赞每人一次）
+- [x] `POST /api/moments/[id]/comments`、`DELETE …/comments/[commentId]`、`PUT /api/moments/[id]/likes`
+- [x] 详情页：爱心（乐观更新）+「谁喜欢」、评论列表（本地时间、可删不可改、不做楼中楼）、评论输入与「我是 乖宝/臭宝」
+- [x] 方格卡片下显示喜欢数与评论数
+- [x] 单测：评论/点赞 schema、作者排序、计数汇总、字号范围
 
 ### Phase 9c 流光模板与贴纸（Decision 021）
 - [x] `moments.layout` jsonb migration（模板、浮动文字位置/样式、贴纸）；`MomentLayoutSchema` Zod 校验，读取容错回落简约
@@ -18,6 +26,7 @@ Phase 9c — 流光模板与贴纸（已实现；需在 Supabase 执行 `2026101
 - [x] 编辑器：发布与编辑共用（编辑可改文字、日期、作者、模板、贴纸）；模板缩略图用真实照片预览
 - [x] 方格页改为两列（桌面三列）卡片墙，那句话直接可见；详情页长句子被卡片截断时在下方显示全文
 - [x] 单测：排版 schema / 容错解析 / JSON 字段
+- [x] 已在生产 Supabase 执行 `20261017000000_moment_layout.sql`
 
 ### Phase 9b 流光 + 愿望关联（Decision 020）
 - [x] `moments` 表 migration（一张照片 + 一句话 ≤140、日期、作者、`seq` 发布顺序）；`wishes.moment_id`（一愿望一流光）

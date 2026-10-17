@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useState } from "react";
-import { Plus } from "lucide-react";
+import { Heart, MessageCircle, Plus } from "lucide-react";
 import { InfiniteScrollSentinel } from "@/components/experience/infinite-scroll-sentinel";
 import { MomentComposer } from "@/components/experience/moment-composer";
 import { MomentCard } from "@/components/moments/moment-card";
@@ -93,6 +93,20 @@ export function MomentsGrid({ initialMoments, initialCursor, names, canEdit }: M
                   layout={moment.layout}
                 />
               </Link>
+              <p className="mt-1.5 flex h-4 items-center justify-end gap-3 px-1 text-xs text-muted-ours">
+                {moment.likedBy.length > 0 ? (
+                  <span className="inline-flex items-center gap-1" aria-label={`${moment.likedBy.length} 个喜欢`}>
+                    <Heart className="size-3.5 fill-[#e7799a] text-[#e7799a]" aria-hidden />
+                    {moment.likedBy.length}
+                  </span>
+                ) : null}
+                {moment.commentCount > 0 ? (
+                  <span className="inline-flex items-center gap-1" aria-label={`${moment.commentCount} 条评论`}>
+                    <MessageCircle className="size-3.5" aria-hidden />
+                    {moment.commentCount}
+                  </span>
+                ) : null}
+              </p>
             </li>
           ))}
         </ul>
