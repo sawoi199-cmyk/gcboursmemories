@@ -4,6 +4,7 @@ import { analyzeAndApplyMemoryDraft } from "@/features/diary-generation/analyze-
 import { GenerationModeSchema } from "@/lib/ai/types";
 import { requireSiteSession } from "@/lib/security/require-site-session";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
+import { invalidPayloadResponse } from "@/lib/validation/invalid-payload";
 
 const BodySchema = z.object({
   memoryId: z.string().uuid(),
@@ -32,7 +33,15 @@ export async function POST(request: Request) {
     const json: unknown = await request.json();
     const parsed = BodySchema.safeParse(json);
     if (!parsed.success) {
-      return NextResponse.json({ ok: false, message: "Invalid payload" }, { status: 400 });
+      return invalidPayloadResponse(parsed.error, {
+        memoryId: "回忆 ID",
+        tone: "语气",
+        excludedDetails: "不要写进日记",
+        language: "语言",
+        mode: "生成方式",
+        preserveTitle: "保留标题",
+        preserveOneLine: "保留一句话",
+      });
     }
 
     const result = await analyzeAndApplyMemoryDraft({

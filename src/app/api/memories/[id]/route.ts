@@ -4,9 +4,14 @@ import {
   deleteMemoryEvent,
 } from "@/features/memories/delete-memory";
 import { getEditorMemory } from "@/features/memories/get-editor-memory";
-import { SaveMemorySchema, saveMemoryEvent } from "@/features/memories/save-memory";
+import {
+  SaveMemoryFieldLabels,
+  SaveMemorySchema,
+  saveMemoryEvent,
+} from "@/features/memories/save-memory";
 import { requireSiteSession } from "@/lib/security/require-site-session";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
+import { invalidPayloadResponse } from "@/lib/validation/invalid-payload";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -53,7 +58,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     const json: unknown = await request.json();
     const parsed = SaveMemorySchema.safeParse(json);
     if (!parsed.success) {
-      return NextResponse.json({ ok: false, message: "Invalid payload" }, { status: 400 });
+      return invalidPayloadResponse(parsed.error, SaveMemoryFieldLabels);
     }
 
     const result = await saveMemoryEvent({
@@ -95,7 +100,7 @@ export async function DELETE(request: Request, context: RouteContext) {
 
     const parsed = DeleteMemoryBodySchema.safeParse(body);
     if (!parsed.success) {
-      return NextResponse.json({ ok: false, message: "Invalid payload" }, { status: 400 });
+      return invalidPayloadResponse(parsed.error, { confirmTitle: "确认标题" });
     }
 
     const result = await deleteMemoryEvent({

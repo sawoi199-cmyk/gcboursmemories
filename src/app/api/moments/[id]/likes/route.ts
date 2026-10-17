@@ -3,6 +3,7 @@ import { authorizeMomentRoute, momentRouteError } from "@/app/api/moments/route-
 import { SetLikeSchema } from "@/features/moments/moment-schema";
 import { setLike } from "@/features/moments/moment-social";
 import { createServiceClient } from "@/lib/supabase/admin";
+import { invalidPayloadResponse } from "@/lib/validation/invalid-payload";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -16,7 +17,7 @@ export async function PUT(request: Request, context: RouteContext) {
 
     const parsed = SetLikeSchema.safeParse(await request.json());
     if (!parsed.success) {
-      return NextResponse.json({ ok: false, message: "Invalid payload" }, { status: 400 });
+      return invalidPayloadResponse(parsed.error, { author: "点赞人", liked: "点赞状态" });
     }
 
     const likedBy = await setLike(createServiceClient(), auth.ownerId, auth.ids.id, parsed.data);

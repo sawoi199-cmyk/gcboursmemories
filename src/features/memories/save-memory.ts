@@ -4,7 +4,8 @@ import { revalidatePublishedArchive } from "@/features/memories/published";
 import { createServiceClient } from "@/lib/supabase/admin";
 
 export const SaveMemorySchema = z.object({
-  title: z.string().min(1).max(120),
+  // Blank while the user clears it (e.g. to let AI write one); saving keeps the stored title.
+  title: z.string().trim().max(120),
   oneLine: z.string().max(200).nullable(),
   diaryBody: z.string().max(8000).nullable(),
   userNote: z.string().max(4000).nullable(),
@@ -30,6 +31,20 @@ export const SaveMemorySchema = z.object({
     .max(100),
 });
 
+export const SaveMemoryFieldLabels = {
+  title: "标题",
+  oneLine: "一句话",
+  diaryBody: "日记正文",
+  userNote: "记忆备注",
+  eventDate: "日期",
+  placeName: "地点",
+  templateId: "版式",
+  chapter: "故事章节",
+  photoOrder: "照片",
+  "photoOrder.photoId": "照片 ID",
+  "photoOrder.role": "照片角色",
+};
+
 export type SaveMemoryInput = z.infer<typeof SaveMemorySchema>;
 
 export async function saveMemoryEvent(input: {
@@ -43,7 +58,7 @@ export async function saveMemoryEvent(input: {
   const { error: updateError } = await supabase
     .from("memory_events")
     .update({
-      title: input.payload.title,
+      ...(input.payload.title ? { title: input.payload.title } : {}),
       one_line: input.payload.oneLine,
       diary_body: input.payload.diaryBody,
       user_note: input.payload.userNote,

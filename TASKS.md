@@ -86,3 +86,4 @@ Phase 9d — 流光字号、评论与点赞（已实现；需在 Supabase 执行
 - UX：上传向导去掉未接线的「补充真实记忆 / 假预览」步骤（Decision 012）；记忆与 AI 只在编辑器填写
 - 文案：去掉前台/Studio 可见的 Phase 开发期说明（今日页、上传向导、设置页）
 - Bugfix：故事封面「点开读不到图、过会儿重开才加载」——签名 URL 曾被 `unstable_cache` 缓存，陈旧返回时已过期。改为缓存只存缩略图路径、签名移到 getter 边界现签（`signPublishedMemories`）；同修 `getStoryChapters`/章节详情首屏/回忆详情/`getPublishedMemories`（Decision 017）
+- Bugfix：编辑器清空标题后点「生成」会报 `Invalid payload`（生成前自动保存要求标题非空）。现在标题可留空：保存时保留原标题，AI 会重新写标题（「只重写日记」此时也补标题）；所有接口的格式报错改为中文并写明是哪个字段（`invalidPayloadResponse`）

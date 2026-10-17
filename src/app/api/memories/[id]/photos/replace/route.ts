@@ -5,6 +5,7 @@ import { isDriveConfigured } from "@/lib/google-drive/gas-client";
 import { parseUploadExifFromForm } from "@/lib/image/compress-for-upload";
 import { requireSiteSession } from "@/lib/security/require-site-session";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
+import { invalidPayloadResponse } from "@/lib/validation/invalid-payload";
 
 export const runtime = "nodejs";
 
@@ -38,7 +39,7 @@ export async function POST(request: Request, context: RouteContext) {
 
     const photoId = z.string().uuid().safeParse(form.get("photoId"));
     if (!photoId.success) {
-      return NextResponse.json({ ok: false, message: "Invalid payload" }, { status: 400 });
+      return invalidPayloadResponse(photoId.error, { "": "照片 ID" });
     }
 
     const result = await replacePhotoOnMemory({

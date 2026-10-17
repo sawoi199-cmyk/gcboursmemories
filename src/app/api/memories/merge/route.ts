@@ -3,6 +3,7 @@ import { z } from "zod";
 import { mergeMemoryEvents } from "@/features/memories/merge-split";
 import { requireSiteSession } from "@/lib/security/require-site-session";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
+import { invalidPayloadResponse } from "@/lib/validation/invalid-payload";
 
 const BodySchema = z.object({
   targetId: z.string().uuid(),
@@ -23,7 +24,7 @@ export async function POST(request: Request) {
     const json: unknown = await request.json();
     const parsed = BodySchema.safeParse(json);
     if (!parsed.success) {
-      return NextResponse.json({ ok: false, message: "Invalid payload" }, { status: 400 });
+      return invalidPayloadResponse(parsed.error, { targetId: "目标回忆", sourceId: "要合并的回忆" });
     }
 
     const result = await mergeMemoryEvents({

@@ -5,6 +5,7 @@ import {
 } from "@/features/memories/remove-photos";
 import { requireSiteSession } from "@/lib/security/require-site-session";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
+import { invalidPayloadResponse } from "@/lib/validation/invalid-payload";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -25,7 +26,7 @@ export async function POST(request: Request, context: RouteContext) {
     const json: unknown = await request.json();
     const parsed = RemovePhotosBodySchema.safeParse(json);
     if (!parsed.success) {
-      return NextResponse.json({ ok: false, message: "Invalid payload" }, { status: 400 });
+      return invalidPayloadResponse(parsed.error, { photoIds: "要移除的照片" });
     }
 
     const result = await removePhotosFromEvent({

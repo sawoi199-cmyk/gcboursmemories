@@ -21,6 +21,21 @@ describe("SaveMemorySchema", () => {
     expect(result.success).toBe(true);
   });
 
+  it("accepts a blank title so autosave works while AI writes one", () => {
+    const result = SaveMemorySchema.safeParse({
+      title: "   ",
+      oneLine: null,
+      diaryBody: null,
+      userNote: null,
+      eventDate: "2025-05-20",
+      placeName: null,
+      templateId: "editorial-hero",
+      photoOrder: [],
+    });
+    expect(result.success).toBe(true);
+    expect(result.data?.title).toBe("");
+  });
+
   it("rejects invalid dates", () => {
     const result = SaveMemorySchema.safeParse({
       title: "x",

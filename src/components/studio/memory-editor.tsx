@@ -148,7 +148,8 @@ export function MemoryEditor({ initial }: MemoryEditorProps) {
       setSavedAt(
         `${message} · ${new Date(json.savedAt ?? Date.now()).toLocaleTimeString("zh-CN")}`,
       );
-      setSavedTitle(title);
+      // A blank title is not saved (the stored one is kept), so don't treat it as saved.
+      if (title.trim()) setSavedTitle(title);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Save failed");
       if (options?.throwOnError) throw err;
@@ -258,6 +259,9 @@ export function MemoryEditor({ initial }: MemoryEditorProps) {
 
     setAiBusy(true);
     setError(null);
+    // An empty title field means "let AI write one": never preserve it, and have
+    // "只重写日记" fill in the title as well instead of restoring the stored one.
+    const titleBlank = !title.trim();
     try {
       await persist("生成前已保存", { throwOnError: true });
       const response = await fetch("/api/ai/analyze-memory", {
@@ -268,8 +272,8 @@ export function MemoryEditor({ initial }: MemoryEditorProps) {
           tone,
           excludedDetails,
           language: "zh-CN",
-          mode,
-          preserveTitle,
+          mode: titleBlank && mode === "diary_only" ? "title_and_diary" : mode,
+          preserveTitle: preserveTitle && !titleBlank,
           preserveOneLine,
         }),
       });

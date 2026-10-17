@@ -5,6 +5,7 @@ import { revalidatePublishedArchive } from "@/features/memories/published";
 import { requireSiteSession } from "@/lib/security/require-site-session";
 import { createServiceClient } from "@/lib/supabase/admin";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
+import { invalidPayloadResponse } from "@/lib/validation/invalid-payload";
 
 const BodySchema = z.object({
   labels: z.record(z.string(), z.string().max(40)),
@@ -52,7 +53,7 @@ export async function POST(request: Request) {
     const json: unknown = await request.json();
     const parsed = BodySchema.safeParse(json);
     if (!parsed.success) {
-      return NextResponse.json({ ok: false, message: "Invalid payload" }, { status: 400 });
+      return invalidPayloadResponse(parsed.error, { labels: "章节名称" });
     }
 
     const custom: Partial<Record<ChapterId, string>> = {};

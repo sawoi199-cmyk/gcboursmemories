@@ -3,6 +3,7 @@ import { z } from "zod";
 import { restoreDiaryVersion } from "@/features/diary-generation/analyze-memory";
 import { requireSiteSession } from "@/lib/security/require-site-session";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
+import { invalidPayloadResponse } from "@/lib/validation/invalid-payload";
 
 const BodySchema = z.object({
   versionId: z.string().uuid(),
@@ -27,7 +28,7 @@ export async function POST(request: Request, context: RouteContext) {
     const json: unknown = await request.json();
     const parsed = BodySchema.safeParse(json);
     if (!parsed.success) {
-      return NextResponse.json({ ok: false, message: "Invalid payload" }, { status: 400 });
+      return invalidPayloadResponse(parsed.error, { versionId: "版本 ID" });
     }
 
     await restoreDiaryVersion({
